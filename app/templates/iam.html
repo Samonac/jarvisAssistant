@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Access Management{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="iamApp()" x-init="fetchAll()">
+    <h2>🔐 Identity & Access Management</h2>
+
+    <!-- Users Section -->
+    <section class="dashboard-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3>Users</h3>
+            <button class="btn btn-primary" @click="showAddUser = !showAddUser">+ Add User</button>
+        </div>
+
+        <!-- Add user form -->
+        <div x-show="showAddUser" style="padding:1rem;background:var(--bg-input);border-radius:8px;margin-bottom:1rem">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" class="form-input" x-model="newUser.username" placeholder="username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" class="form-input" x-model="newUser.password" placeholder="password">
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select class="voice-select" x-model="newUser.role">
+                    <template x-for="r in roles" :key="r.name">
+                        <option :value="r.name" x-text="r.name + ' — ' + r.description"></option>
+                    </template>
+                </select>
+            </div>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-primary" @click="createUser()">Create</button>
+                <button class="btn" @click="showAddUser = false">Cancel</button>
+            </div>
+        </div>
+
+        <div x-show="msg" class="alert" :class="msgOk ? 'alert-success' : 'alert-error'" x-text="msg"></div>
+
+        <!-- User table -->
+        <table class="data-table" x-show="users.length > 0">
+            <thead><tr><th>Username</th><th>Role</th><th>Active</th><th>Last Login</th><th>Actions</th></tr></thead>
+            <tbody>
+                <template x-for="u in users" :key="u.username">
+                    <tr>
+                        <td x-text="u.username"></td>
+                        <td>
+                            <select class="voice-select" style="padding:0.2rem;font-size:0.8rem"
+                                    :value="u.role" @change="updateUser(u.username, {role: $event.target.value})">
+                                <template x-for="r in roles" :key="r.name">
+                                    <option :value="r.name" x-text="r.name" :selected="r.name === u.role"></option>
+                                </template>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="checkbox" :checked="u.active"
+                                   @change="updateUser(u.username, {active: $event.target.checked})">
+                        </td>
+                        <td style="font-size:0.75rem" x-text="u.last_login || 'Never'"></td>
+                        <td><button class="btn" style="padding:0.2rem 0.5rem;font-size:0.75rem" @click="deleteUser(u.username)">🗑️</button></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Roles & Permissions Section -->
+    <section class="dashboard-section">
+        <h3>Roles & Permissions</h3>
+        <template x-for="r in roles" :key="r.name">
+            <div style="margin-bottom:1.5rem;padding:1rem;background:var(--bg-input);border-radius:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <strong x-text="r.name" style="text-transform:uppercase"></strong>
+                    <span style="font-size:0.75rem;color:var(--text-muted)" x-text="r.description"></span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:0.5rem">
+                    <template x-for="[perm, info] in Object.entries(permissionGroups)" :key="perm">
+                        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer">
+                            <input type="checkbox"
+                                   :checked="r.permissions.includes(perm)"
+                                   @change="togglePermission(r.name, perm, $event.target.checked)">
+                            <span x-text="info.description"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function iamApp() {
+    return {
+        users: [],
+        roles: [],
+        permissionGroups: {},
+        showAddUser: false,
+        newUser: {username: '', password: '', role: 'user'},
+        msg: '',
+        msgOk: false,
+
+        async fetchAll() {
+            await Promise.all([this.fetchUsers(), this.fetchRoles(), this.fetchPermissions()]);
+        },
+
+        async fetchUsers() {
+            try { const r = await fetch('/api/iam/users'); if (r.ok) this.users = await r.json(); } catch(e) {}
+        },
+        async fetchRoles() {
+            try { const r = await fetch('/api/iam/roles'); if (r.ok) this.roles = await r.json(); } catch(e) {}
+        },
+        async fetchPermissions() {
+            try { const r = await fetch('/api/iam/permissions'); if (r.ok) this.permissionGroups = await r.json(); } catch(e) {}
+        },
+
+        async createUser() {
+            const r = await fetch('/api/iam/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(this.newUser)});
+            const d = await r.json();
+            this.msg = d.message || d.error; this.msgOk = !!d.success;
+            if (d.success) { this.showAddUser = false; this.newUser = {username:'',password:'',role:'user'}; await this.fetchUsers(); }
+            setTimeout(() => this.msg = '', 4000);
+        },
+
+        async updateUser(username, updates) {
+            const r = await fetch(`/api/iam/users/${username}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(updates)});
+            const d = await r.json();
+            this.msg = d.message || d.error; this.msgOk = !!d.success;
+            await this.fetchUsers();
+            setTimeout(() => this.msg = '', 3000);
+        },
+
+        async deleteUser(username) {
+            if (!confirm(`Delete user '${username}'?`)) return;
+            await fetch(`/api/iam/users/${username}`, {method:'DELETE'});
+            await this.fetchUsers();
+        },
+
+        async togglePermission(roleName, perm, checked) {
+            const role = this.roles.find(r => r.name === roleName);
+            if (!role) return;
+            let perms = [...role.permissions];
+            if (checked && !perms.includes(perm)) perms.push(perm);
+            if (!checked) perms = perms.filter(p => p !== perm);
+            await fetch('/api/iam/roles', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({name: roleName, permissions: perms, description: role.description})});
+            await this.fetchRoles();
+        }
+    }
+}
+</script>
+{% endblock %}

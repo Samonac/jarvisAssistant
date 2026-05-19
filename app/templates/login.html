@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. - Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-header">
+            <span class="login-logo">⚡</span>
+            <h1>J.A.R.V.I.S.</h1>
+            <p class="login-subtitle">Just A Rather Very Intelligent System</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/login" class="login-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autofocus
+                       placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required
+                       placeholder="Enter password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Access System</button>
+        </form>
+
+        <p style="text-align:center;margin-top:1rem;font-size:0.85rem;color:var(--text-muted)">
+            Don't have an account? <a href="/signup" style="color:var(--accent)">Sign up</a>
+        </p>
+    </div>
+</body>
+</html>

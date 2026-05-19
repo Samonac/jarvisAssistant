@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Workflows{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="workflowsPage()" x-init="init()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2>⚡ Workflows</h2>
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary" @click="showEditor = true; resetEditor()">➕ New Flow</button>
+            <button class="btn" @click="fetchFlows()">🔄 Refresh</button>
+        </div>
+    </div>
+
+    <div x-show="msg" class="alert" :class="msgOk ? 'alert-success' : 'alert-error'" x-text="msg"></div>
+
+    <!-- Filters (admin) -->
+    {% if 'admin' in user_permissions %}
+    <section class="dashboard-section" style="padding:0.75rem">
+        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;font-size:0.8rem">
+            <label><input type="checkbox" x-model="showAll"> Show all users</label>
+            <select x-model="filterStatus" class="form-input" style="max-width:140px;font-size:0.8rem;padding:0.3rem">
+                <option value="">All statuses</option>
+                <option value="success">✅ Success</option>
+                <option value="failed">❌ Failed</option>
+                <option value="running">🔄 Running</option>
+            </select>
+            <span class="text-muted" x-text="filteredFlows.length + ' flow(s)'"></span>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Flow List -->
+    <section class="dashboard-section">
+        <div x-show="filteredFlows.length === 0" class="text-muted" style="padding:1rem">No workflows yet. Click "New Flow" to create one.</div>
+        <div style="display:grid;gap:0.75rem">
+            <template x-for="f in filteredFlows" :key="f.id">
+                <div class="metric-card" style="cursor:pointer" @click="openFlow(f.id)">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <strong x-text="f.name" style="font-size:0.95rem"></strong>
+                            <span x-show="f.schedule" style="font-size:0.65rem;background:var(--accent);color:white;padding:0.1rem 0.3rem;border-radius:3px;margin-left:0.3rem" x-text="'⏰ ' + f.schedule"></span>
+                            <span x-show="f.is_running" style="font-size:0.65rem;background:var(--success);color:white;padding:0.1rem 0.3rem;border-radius:3px;margin-left:0.3rem">▶ Running</span>
+                        </div>
+                        <div style="display:flex;gap:0.3rem;align-items:center">
+                            <span style="font-size:0.7rem;color:var(--text-muted)" x-text="f.run_count + ' runs'"></span>
+                            <span x-show="f.last_status === 'success'" style="color:var(--success)">✅</span>
+                            <span x-show="f.last_status === 'failed'" style="color:var(--error)">❌</span>
+                        </div>
+                    </div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem">
+                        <span x-text="f.description || 'No description'"></span>
+                        <span x-show="f.blocks.length"> • <span x-text="f.blocks.length + ' blocks'"></span></span>
+                        {% if 'admin' in user_permissions %}
+                        <span> • Owner: <span x-text="f.username"></span></span>
+                        {% endif %}
+                    </div>
+                    <div style="display:flex;gap:0.3rem;margin-top:0.5rem" @click.stop>
+                        <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="runFlow(f.id)">▶ Run</button>
+                        <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="openEditor(f)">✏️ Edit</button>
+                        <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="viewRuns(f.id, f.name)">📋 History</button>
+                        <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:var(--error);color:white" @click="deleteFlow(f.id)">🗑️</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <!-- Flow Editor Modal -->
+    <div x-show="showEditor" x-cloak style="position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:stretch;justify-content:center;z-index:1000;padding:1rem" @keydown.escape.window="showEditor=false">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;width:100%;max-width:1100px;display:flex;flex-direction:column;overflow:hidden">
+            <!-- Editor Header -->
+            <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+                <div style="display:flex;gap:0.75rem;align-items:center;flex:1">
+                    <input type="text" x-model="editor.name" class="form-input" style="max-width:250px;font-weight:600" placeholder="Flow name">
+                    <input type="text" x-model="editor.description" class="form-input" style="flex:1" placeholder="Description (optional)">
+                    <input type="text" x-model="editor.schedule" class="form-input" style="max-width:150px" placeholder="Schedule (optional)" title="e.g. daily 08:00, every 5m, hourly">
+                </div>
+                <div style="display:flex;gap:0.3rem">
+                    <button class="btn btn-primary" style="font-size:0.8rem" @click="saveFlow()">💾 Save</button>
+                    <button class="btn" style="font-size:0.8rem" @click="showEditor=false">✕</button>
+                </div>
+            </div>
+
+            <!-- Editor Body -->
+            <div style="display:flex;flex:1;overflow:hidden">
+                <!-- Block Palette (side menu) -->
+                <div style="width:180px;border-right:1px solid var(--border);padding:0.5rem;overflow-y:auto">
+                    <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.5rem;color:var(--text-muted)">BLOCKS</div>
+                    <template x-for="(info, type) in blockTypes" :key="type">
+                        <div class="block-palette-item" draggable="true"
+                             @dragstart="dragType = type"
+                             @click="addBlock(type)">
+                            <span x-text="info.icon"></span>
+                            <span x-text="info.label" style="font-size:0.75rem"></span>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Canvas -->
+                <div style="flex:1;padding:1rem;overflow-y:auto;position:relative"
+                     @dragover.prevent @drop="addBlock(dragType)">
+                    <div x-show="editor.blocks.length === 0" style="text-align:center;padding:3rem;color:var(--text-muted);font-size:0.85rem">
+                        Click or drag blocks from the left panel to build your flow.<br>
+                        Blocks execute top-to-bottom. Connect outputs to inputs.
+                    </div>
+
+                    <!-- Block List -->
+                    <div style="display:flex;flex-direction:column;gap:0.5rem">
+                        <template x-for="(block, idx) in editor.blocks" :key="block.id">
+                            <div class="flow-block" :class="selectedBlock === idx ? 'flow-block-selected' : ''"
+                                 @click="selectedBlock = idx">
+                                <div style="display:flex;justify-content:space-between;align-items:center">
+                                    <div style="display:flex;align-items:center;gap:0.4rem">
+                                        <span style="cursor:grab" title="Drag to reorder">⋮⋮</span>
+                                        <span x-text="blockTypes[block.type]?.icon || '❓'"></span>
+                                        <input type="text" x-model="block.name" class="block-name-input"
+                                               :placeholder="blockTypes[block.type]?.label || block.type">
+                                    </div>
+                                    <div style="display:flex;gap:0.2rem">
+                                        <button class="btn-sm" @click.stop="moveBlock(idx, -1)" :disabled="idx === 0">↑</button>
+                                        <button class="btn-sm" @click.stop="moveBlock(idx, 1)" :disabled="idx === editor.blocks.length - 1">↓</button>
+                                        <button class="btn-sm btn-sm-danger" @click.stop="removeBlock(idx)">✕</button>
+                                    </div>
+                                </div>
+                                <!-- Block Config (shown when selected) -->
+                                <div x-show="selectedBlock === idx" x-cloak style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)">
+                                    <template x-if="block.type === 'script'">
+                                        <div>
+                                            <textarea x-model="block.config.code" class="form-input" rows="4" style="font-family:monospace;font-size:0.8rem" placeholder="Python code. Use INPUT and CONTEXT variables."></textarea>
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'command'">
+                                        <div>
+                                            <input type="text" x-model="block.config.command" class="form-input" placeholder="Shell command (use {variable} for substitution)">
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'api_call'">
+                                        <div style="display:flex;flex-direction:column;gap:0.3rem">
+                                            <div style="display:flex;gap:0.3rem">
+                                                <select x-model="block.config.method" class="form-input" style="max-width:80px">
+                                                    <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+                                                </select>
+                                                <input type="text" x-model="block.config.url" class="form-input" placeholder="https://api.example.com/endpoint">
+                                            </div>
+                                            <textarea x-model="block.config.body" class="form-input" rows="2" style="font-family:monospace;font-size:0.8rem" placeholder='Request body (JSON, optional)'></textarea>
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'decision'">
+                                        <div>
+                                            <input type="text" x-model="block.config.condition" class="form-input" style="font-family:monospace" placeholder="Python condition, e.g. INPUT.get('success') == True">
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'loop'">
+                                        <div>
+                                            <label style="font-size:0.75rem">Iterations:</label>
+                                            <input type="number" x-model.number="block.config.iterations" class="form-input" style="max-width:80px" min="1" max="100">
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'delay'">
+                                        <div>
+                                            <label style="font-size:0.75rem">Seconds:</label>
+                                            <input type="number" x-model.number="block.config.seconds" class="form-input" style="max-width:80px" min="1" max="300">
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'notify'">
+                                        <div>
+                                            <input type="text" x-model="block.config.message" class="form-input" placeholder="Notification message (use {variable} for substitution)">
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'set_variable'">
+                                        <div style="display:flex;gap:0.3rem">
+                                            <input type="text" x-model="block.config.name" class="form-input" style="max-width:120px" placeholder="Variable name">
+                                            <input type="text" x-model="block.config.value" class="form-input" placeholder="Value (or $input for previous output)">
+                                        </div>
+                                    </template>
+                                    <template x-if="block.type === 'jarvis_chat'">
+                                        <div>
+                                            <input type="text" x-model="block.config.message" class="form-input" placeholder="Message to send to Jarvis">
+                                        </div>
+                                    </template>
+                                    <div style="margin-top:0.3rem">
+                                        <label style="font-size:0.7rem" class="voice-toggle-label">
+                                            <input type="checkbox" x-model="block.config.continue_on_error"> Continue on error
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Run History Modal -->
+    <div x-show="showRuns" x-cloak style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000" @click.self="showRuns=false">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;width:95%;max-width:700px;max-height:80vh;overflow-y:auto">
+            <h3 style="margin:0 0 1rem" x-text="'📋 Run History — ' + runsFlowName"></h3>
+            <div x-show="runs.length === 0" class="text-muted">No runs yet.</div>
+            <template x-for="run in runs" :key="run.id">
+                <div style="padding:0.6rem;background:var(--bg-input);border-radius:6px;margin-bottom:0.5rem;font-size:0.8rem">
+                    <div style="display:flex;justify-content:space-between">
+                        <span>
+                            <span x-text="run.status === 'success' ? '✅' : run.status === 'failed' ? '❌' : '🔄'"></span>
+                            <strong x-text="run.status"></strong>
+                            <span class="text-muted" x-text="' — ' + run.triggered_by"></span>
+                        </span>
+                        <span class="text-muted" x-text="run.started_at"></span>
+                    </div>
+                    <div x-show="run.duration_ms" style="color:var(--text-muted);margin-top:0.2rem" x-text="'Duration: ' + (run.duration_ms/1000).toFixed(2) + 's'"></div>
+                    <div x-show="run.error" style="color:var(--error);margin-top:0.2rem" x-text="'Error: ' + run.error"></div>
+                    <details x-show="run.block_results && run.block_results.length" style="margin-top:0.3rem">
+                        <summary style="cursor:pointer;font-size:0.75rem;color:var(--accent)">Block results (<span x-text="run.block_results?.length || 0"></span>)</summary>
+                        <div style="margin-top:0.3rem;font-family:monospace;font-size:0.7rem;max-height:150px;overflow-y:auto">
+                            <template x-for="br in run.block_results" :key="br.block_id">
+                                <div style="padding:0.2rem 0;border-bottom:1px solid var(--border)">
+                                    <span x-text="(br.success ? '✓' : '✗') + ' ' + br.block_name + ': '"></span>
+                                    <span class="text-muted" x-text="(br.output || br.error || '').substring(0, 100)"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </details>
+                </div>
+            </template>
+            <button class="btn" style="margin-top:1rem" @click="showRuns=false">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.block-palette-item { padding:0.4rem 0.5rem; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.3rem; border:1px solid transparent; }
+.block-palette-item:hover { background:var(--bg-input); border-color:var(--border); }
+.flow-block { padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; }
+.flow-block-selected { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.block-name-input { background:transparent; border:none; color:var(--text-primary); font-size:0.8rem; font-weight:600; width:150px; padding:0.1rem 0.3rem; }
+.block-name-input:focus { outline:none; border-bottom:1px solid var(--accent); }
+.btn-sm { padding:0.15rem 0.35rem; font-size:0.7rem; border:1px solid var(--border); border-radius:3px; background:var(--bg-input); color:var(--text-muted); cursor:pointer; }
+.btn-sm:hover { background:var(--accent); color:white; border-color:var(--accent); }
+.btn-sm-danger:hover { background:var(--error); border-color:var(--error); }
+</style>
+<script>
+function workflowsPage() {
+    return {
+        flows: [], msg: '', msgOk: false,
+        showAll: false, filterStatus: '',
+        showEditor: false, showRuns: false,
+        runs: [], runsFlowName: '',
+        selectedBlock: -1, dragType: '',
+        blockTypes: {},
+        editor: {id: null, name: '', description: '', schedule: '', blocks: [], connections: []},
+
+        get filteredFlows() {
+            let list = this.flows;
+            if (this.filterStatus) list = list.filter(f => f.last_status === this.filterStatus);
+            return list;
+        },
+
+        async init() {
+            await this.fetchBlockTypes();
+            await this.fetchFlows();
+        },
+
+        async fetchBlockTypes() {
+            try {
+                const r = await fetch('/api/flows/block-types');
+                if (r.ok) this.blockTypes = await r.json();
+            } catch(e) { this.blockTypes = {}; }
+        },
+
+        async fetchFlows() {
+            try {
+                const url = this.showAll ? '/api/flows?all=true' : '/api/flows';
+                const r = await fetch(url);
+                if (r.ok) this.flows = await r.json();
+            } catch(e) {}
+        },
+
+        resetEditor() {
+            this.editor = {id: null, name: '', description: '', schedule: '', blocks: [], connections: []};
+            this.selectedBlock = -1;
+        },
+
+        openFlow(id) {
+            const f = this.flows.find(x => x.id === id);
+            if (f) this.openEditor(f);
+        },
+
+        openEditor(f) {
+            this.editor = {
+                id: f.id, name: f.name, description: f.description || '',
+                schedule: f.schedule || '',
+                blocks: JSON.parse(JSON.stringify(f.blocks || [])),
+                connections: JSON.parse(JSON.stringify(f.connections || [])),
+            };
+            // Ensure blocks have config objects
+            this.editor.blocks.forEach(b => { if (!b.config) b.config = {}; });
+            this.selectedBlock = -1;
+            this.showEditor = true;
+        },
+
+        addBlock(type) {
+            if (!type) return;
+            const id = 'b_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+            const block = {id, type, name: '', config: {}};
+            // Set defaults
+            if (type === 'api_call') block.config = {method: 'GET', url: '', body: ''};
+            if (type === 'delay') block.config = {seconds: 5};
+            if (type === 'loop') block.config = {iterations: 3};
+            if (type === 'script') block.config = {code: ''};
+            if (type === 'command') block.config = {command: ''};
+            if (type === 'decision') block.config = {condition: ''};
+            if (type === 'notify') block.config = {message: ''};
+            if (type === 'set_variable') block.config = {name: '', value: ''};
+            if (type === 'jarvis_chat') block.config = {message: ''};
+            this.editor.blocks.push(block);
+            this.selectedBlock = this.editor.blocks.length - 1;
+            // Auto-connect to previous block
+            if (this.editor.blocks.length > 1) {
+                const prev = this.editor.blocks[this.editor.blocks.length - 2];
+                this.editor.connections.push({from: prev.id, to: id});
+            }
+            this.dragType = '';
+        },
+
+        removeBlock(idx) {
+            const block = this.editor.blocks[idx];
+            this.editor.connections = this.editor.connections.filter(c => c.from !== block.id && c.to !== block.id);
+            this.editor.blocks.splice(idx, 1);
+            this.selectedBlock = -1;
+        },
+
+        moveBlock(idx, dir) {
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= this.editor.blocks.length) return;
+            const temp = this.editor.blocks[idx];
+            this.editor.blocks[idx] = this.editor.blocks[newIdx];
+            this.editor.blocks[newIdx] = temp;
+            this.selectedBlock = newIdx;
+            // Rebuild connections based on new order
+            this.editor.connections = [];
+            for (let i = 1; i < this.editor.blocks.length; i++) {
+                this.editor.connections.push({from: this.editor.blocks[i-1].id, to: this.editor.blocks[i].id});
+            }
+        },
+
+        async saveFlow() {
+            if (!this.editor.name.trim()) { this.msg = 'Name is required.'; this.msgOk = false; return; }
+            const payload = {
+                name: this.editor.name, description: this.editor.description,
+                schedule: this.editor.schedule || null,
+                blocks: this.editor.blocks, connections: this.editor.connections,
+            };
+            try {
+                let r;
+                if (this.editor.id) {
+                    r = await fetch(`/api/flows/${this.editor.id}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+                } else {
+                    r = await fetch('/api/flows', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+                }
+                const data = await r.json();
+                if (r.ok) {
+                    this.msg = data.message || 'Saved!'; this.msgOk = true;
+                    this.showEditor = false;
+                    await this.fetchFlows();
+                } else {
+                    this.msg = data.error || 'Failed.'; this.msgOk = false;
+                }
+                setTimeout(() => this.msg = '', 4000);
+            } catch(e) { this.msg = 'Network error.'; this.msgOk = false; }
+        },
+
+        async runFlow(id) {
+            try {
+                const r = await fetch(`/api/flows/${id}/run`, {method: 'POST'});
+                const data = await r.json();
+                this.msg = data.message || data.error || 'Started'; this.msgOk = !data.error;
+                setTimeout(() => { this.msg = ''; this.fetchFlows(); }, 3000);
+            } catch(e) {}
+        },
+
+        async deleteFlow(id) {
+            if (!confirm('Delete this flow and all its history?')) return;
+            try {
+                await fetch(`/api/flows/${id}`, {method: 'DELETE'});
+                await this.fetchFlows();
+            } catch(e) {}
+        },
+
+        async viewRuns(id, name) {
+            this.runsFlowName = name;
+            try {
+                const r = await fetch(`/api/flows/${id}/runs`);
+                if (r.ok) this.runs = await r.json();
+            } catch(e) { this.runs = []; }
+            this.showRuns = true;
+        }
+    }
+}
+</script>
+{% endblock %}

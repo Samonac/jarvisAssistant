@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="dashboardApp()" x-init="fetchData()" @keydown.escape.window="closeModal()">
+    <h2>System Dashboard</h2>
+
+    <!-- System Resources -->
+    <section class="dashboard-section">
+        <h3>System Resources</h3>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">CPU</div>
+                <div class="gauge">
+                    <div class="gauge-fill" :class="{'warning': system.cpu_percent > 80}"
+                         :style="'width:' + Math.max(0, system.cpu_percent) + '%'"></div>
+                </div>
+                <div class="metric-value" x-text="system.cpu_percent >= 0 ? system.cpu_percent.toFixed(1) + '%' : 'N/A'"></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">RAM</div>
+                <div class="gauge">
+                    <div class="gauge-fill" :class="{'warning': system.ram_percent > 80}"
+                         :style="'width:' + Math.max(0, system.ram_percent) + '%'"></div>
+                </div>
+                <div class="metric-value" x-text="system.ram_percent >= 0 ? system.ram_used_mb.toFixed(0) + ' / ' + system.ram_total_mb.toFixed(0) + ' MB' : 'N/A'"></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Disk</div>
+                <div class="gauge">
+                    <div class="gauge-fill" :class="{'warning': system.disk_percent > 90}"
+                         :style="'width:' + Math.max(0, system.disk_percent) + '%'"></div>
+                </div>
+                <div class="metric-value" x-text="system.disk_percent >= 0 ? system.disk_used_gb.toFixed(1) + ' / ' + system.disk_total_gb.toFixed(1) + ' GB' : 'N/A'"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- KPI Metrics (clickable) -->
+    <section class="dashboard-section">
+        <h3>Usage Metrics</h3>
+        <p class="text-muted" style="font-size:0.75rem;margin-bottom:0.75rem">Click a card to view daily breakdown</p>
+        <div class="kpi-grid">
+            <div class="kpi-card kpi-clickable" @click="openModal('total_calls')">
+                <div class="kpi-value" x-text="metrics.total_calls"></div>
+                <div class="kpi-label">Total Calls</div>
+            </div>
+            <div class="kpi-card kpi-clickable" @click="openModal('calls_today')">
+                <div class="kpi-value" x-text="metrics.calls_today"></div>
+                <div class="kpi-label">Today</div>
+            </div>
+            <div class="kpi-card kpi-clickable" @click="openModal('avg_response_ms')">
+                <div class="kpi-value" x-text="metrics.avg_response_ms.toFixed(0) + 'ms'"></div>
+                <div class="kpi-label">Avg Response</div>
+            </div>
+            <div class="kpi-card kpi-clickable" @click="openModal('p95_response_ms')">
+                <div class="kpi-value" x-text="metrics.p95_response_ms.toFixed(0) + 'ms'"></div>
+                <div class="kpi-label">P95 Response</div>
+            </div>
+            <div class="kpi-card kpi-clickable" @click="openModal('error_rate')">
+                <div class="kpi-value" x-text="(metrics.error_rate * 100).toFixed(1) + '%'"></div>
+                <div class="kpi-label">Error Rate</div>
+            </div>
+            <div class="kpi-card kpi-clickable" @click="openModal('active_sessions')">
+                <div class="kpi-value" x-text="metrics.active_sessions"></div>
+                <div class="kpi-label">Active Sessions</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tool Usage -->
+    <section class="dashboard-section">
+        <h3>Tool Usage</h3>
+        <table class="data-table" x-show="Object.keys(metrics.tool_usage).length > 0">
+            <thead>
+                <tr><th>Tool</th><th>Invocations</th></tr>
+            </thead>
+            <tbody>
+                <template x-for="[tool, count] in Object.entries(metrics.tool_usage)" :key="tool">
+                    <tr>
+                        <td x-text="tool"></td>
+                        <td x-text="count"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+        <p x-show="Object.keys(metrics.tool_usage).length === 0" class="text-muted">No tool usage recorded yet.</p>
+    </section>
+
+    <!-- Modal with bar chart -->
+    <div class="modal-overlay" x-show="modalOpen" x-transition.opacity @click.self="closeModal()">
+        <div class="modal-content" @click.stop>
+            <div class="modal-header">
+                <h3 x-text="modalTitle"></h3>
+                <button class="btn-close-panel" @click="closeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="bar-chart">
+                    <template x-for="(bar, idx) in chartData" :key="idx">
+                        <div class="bar-column">
+                            <div class="bar-value" x-text="bar.label"></div>
+                            <div class="bar-track">
+                                <div class="bar-fill" :style="'height:' + bar.percent + '%'"></div>
+                            </div>
+                            <div class="bar-date" x-text="bar.date"></div>
+                        </div>
+                    </template>
+                </div>
+                <p x-show="chartData.length === 0" class="text-muted" style="text-align:center;padding:2rem">No data available for this period.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboardApp() {
+    return {
+        system: {cpu_percent: 0, ram_used_mb: 0, ram_total_mb: 0, ram_percent: 0, disk_used_gb: 0, disk_total_gb: 0, disk_percent: 0},
+        metrics: {total_calls: 0, calls_today: 0, avg_response_ms: 0, p95_response_ms: 0, tool_usage: {}, error_rate: 0, active_sessions: 0},
+        dailyData: [],
+        modalOpen: false,
+        modalTitle: '',
+        chartData: [],
+
+        async fetchData() {
+            await this.fetchSystem();
+            await this.fetchMetrics();
+            await this.fetchDaily();
+            setInterval(() => this.fetchSystem(), 30000);
+            setInterval(() => this.fetchMetrics(), 60000);
+        },
+
+        async fetchSystem() {
+            try {
+                const resp = await fetch('/api/system');
+                this.system = await resp.json();
+            } catch (e) {}
+        },
+
+        async fetchMetrics() {
+            try {
+                const resp = await fetch('/api/metrics');
+                this.metrics = await resp.json();
+            } catch (e) {}
+        },
+
+        async fetchDaily() {
+            try {
+                const resp = await fetch('/api/metrics/hourly');
+                if (resp.ok) this.dailyData = await resp.json();
+            } catch (e) {}
+        },
+
+        openModal(metric) {
+            const titles = {
+                'total_calls': 'Hourly Calls (Last 24h)',
+                'calls_today': 'Hourly Calls (Last 24h)',
+                'avg_response_ms': 'Hourly Avg Response Time (Last 24h)',
+                'p95_response_ms': 'Hourly Avg Response Time (Last 24h)',
+                'error_rate': 'Hourly Errors (Last 24h)',
+                'active_sessions': 'Hourly Calls (Last 24h)',
+            };
+            this.modalTitle = titles[metric] || 'Hourly Breakdown';
+            this.chartData = this.buildChart(metric);
+            this.modalOpen = true;
+        },
+
+        closeModal() {
+            this.modalOpen = false;
+        },
+
+        buildChart(metric) {
+            if (!this.dailyData || this.dailyData.length === 0) return [];
+
+            let key = 'total_calls';
+            let suffix = '';
+            if (metric === 'avg_response_ms' || metric === 'p95_response_ms') {
+                key = 'avg_response_ms';
+                suffix = 'ms';
+            } else if (metric === 'error_rate') {
+                key = 'error_count';
+            }
+
+            const values = this.dailyData.map(d => d[key] || 0);
+            const maxVal = Math.max(...values, 1);
+
+            return this.dailyData.map((d, i) => ({
+                date: d.hour ? d.hour.substring(11, 16) : `H${i}`,  // HH:MM
+                label: suffix ? values[i].toFixed(0) + suffix : values[i].toString(),
+                percent: (values[i] / maxVal) * 100,
+            }));
+        }
+    }
+}
+</script>
+{% endblock %}

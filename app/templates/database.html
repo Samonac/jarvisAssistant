@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Database{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="dbApp()" x-init="fetchTables()">
+    <h2>Database Manager</h2>
+
+    <!-- Table selector -->
+    <section class="dashboard-section">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+            <template x-for="t in tables" :key="t.name">
+                <button class="btn" :class="selectedTable === t.name ? 'btn-primary' : ''"
+                        @click="selectTable(t.name)"
+                        x-text="t.name + ' (' + t.row_count + ')'"></button>
+            </template>
+        </div>
+    </section>
+
+    <!-- Table data -->
+    <section class="dashboard-section" x-show="selectedTable">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3 x-text="selectedTable + ' (' + totalRows + ' rows)'"></h3>
+            <button class="btn btn-primary" @click="showAddForm = !showAddForm">+ Add Row</button>
+        </div>
+
+        <!-- Add row form -->
+        <div x-show="showAddForm" class="settings-section" style="margin-bottom:1rem;padding:1rem;background:var(--bg-input);border-radius:8px">
+            <h4 style="margin-top:0">New Row</h4>
+            <template x-for="col in columns" :key="col">
+                <div class="form-group" x-show="col !== 'id'">
+                    <label x-text="col"></label>
+                    <input type="text" class="form-input" x-model="newRow[col]" :placeholder="col">
+                </div>
+            </template>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-primary" @click="insertRow()">Save</button>
+                <button class="btn" @click="showAddForm = false">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Status message -->
+        <div x-show="statusMsg" class="alert" :class="statusOk ? 'alert-success' : 'alert-error'" x-text="statusMsg"></div>
+
+        <!-- Data table -->
+        <div style="overflow-x:auto">
+            <table class="data-table" x-show="rows.length > 0">
+                <thead>
+                    <tr>
+                        <template x-for="col in columns" :key="col">
+                            <th x-text="col"></th>
+                        </template>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="row in rows" :key="row.id || JSON.stringify(row)">
+                        <tr>
+                            <template x-for="col in columns" :key="col">
+                                <td>
+                                    <span x-show="editingId !== row.id" x-text="row[col]" style="max-width:200px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                                    <input x-show="editingId === row.id" type="text" class="form-input"
+                                           x-model="editRow[col]" style="padding:0.2rem 0.4rem;font-size:0.8rem"
+                                           :disabled="col === 'id'">
+                                </td>
+                            </template>
+                            <td style="white-space:nowrap">
+                                <template x-if="editingId !== row.id">
+                                    <span>
+                                        <button class="btn" style="padding:0.2rem 0.5rem;font-size:0.75rem" @click="startEdit(row)">✏️</button>
+                                        <button class="btn" style="padding:0.2rem 0.5rem;font-size:0.75rem" @click="deleteRow(row.id)">🗑️</button>
+                                    </span>
+                                </template>
+                                <template x-if="editingId === row.id">
+                                    <span>
+                                        <button class="btn btn-primary" style="padding:0.2rem 0.5rem;font-size:0.75rem" @click="saveEdit()">💾</button>
+                                        <button class="btn" style="padding:0.2rem 0.5rem;font-size:0.75rem" @click="editingId = null">✕</button>
+                                    </span>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <p x-show="rows.length === 0 && selectedTable" class="text-muted">No rows in this table.</p>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dbApp() {
+    return {
+        tables: [],
+        selectedTable: '',
+        columns: [],
+        rows: [],
+        totalRows: 0,
+        showAddForm: false,
+        newRow: {},
+        editingId: null,
+        editRow: {},
+        statusMsg: '',
+        statusOk: false,
+
+        async fetchTables() {
+            try {
+                const resp = await fetch('/api/db/tables');
+                if (resp.ok) this.tables = await resp.json();
+            } catch (e) {}
+        },
+
+        async selectTable(name) {
+            this.selectedTable = name;
+            this.editingId = null;
+            this.showAddForm = false;
+            this.statusMsg = '';
+            await this.fetchRows();
+        },
+
+        async fetchRows() {
+            try {
+                const resp = await fetch(`/api/db/${this.selectedTable}?limit=200`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.columns = data.columns;
+                    this.rows = data.rows;
+                    this.totalRows = data.total;
+                    this.newRow = {};
+                    this.columns.forEach(c => { if (c !== 'id') this.newRow[c] = ''; });
+                }
+            } catch (e) {}
+        },
+
+        async insertRow() {
+            // Remove empty fields and 'id'
+            const payload = {};
+            for (const [k, v] of Object.entries(this.newRow)) {
+                if (k !== 'id' && v !== '') payload[k] = v;
+            }
+            try {
+                const resp = await fetch(`/api/db/${this.selectedTable}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.statusMsg = data.message;
+                    this.statusOk = true;
+                    this.showAddForm = false;
+                    await this.fetchRows();
+                    await this.fetchTables();
+                } else {
+                    this.statusMsg = data.error;
+                    this.statusOk = false;
+                }
+                setTimeout(() => this.statusMsg = '', 4000);
+            } catch (e) {
+                this.statusMsg = 'Network error';
+                this.statusOk = false;
+            }
+        },
+
+        startEdit(row) {
+            this.editingId = row.id;
+            this.editRow = {...row};
+        },
+
+        async saveEdit() {
+            const payload = {...this.editRow};
+            delete payload.id;
+            try {
+                const resp = await fetch(`/api/db/${this.selectedTable}/${this.editingId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.statusMsg = data.message;
+                    this.statusOk = true;
+                    this.editingId = null;
+                    await this.fetchRows();
+                } else {
+                    this.statusMsg = data.error;
+                    this.statusOk = false;
+                }
+                setTimeout(() => this.statusMsg = '', 4000);
+            } catch (e) {}
+        },
+
+        async deleteRow(id) {
+            if (!confirm('Delete this row?')) return;
+            try {
+                const resp = await fetch(`/api/db/${this.selectedTable}/${id}`, {method: 'DELETE'});
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.statusMsg = data.message;
+                    this.statusOk = true;
+                    await this.fetchRows();
+                    await this.fetchTables();
+                } else {
+                    this.statusMsg = data.error;
+                    this.statusOk = false;
+                }
+                setTimeout(() => this.statusMsg = '', 4000);
+            } catch (e) {}
+        }
+    }
+}
+</script>
+{% endblock %}

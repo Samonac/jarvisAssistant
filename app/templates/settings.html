@@ -1,0 +1,996 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Settings{% endblock %}
+
+{% block content %}
+<div class="settings-container" x-data="settingsApp()" x-init="fetchConfig()">
+    <h2>Configuration</h2>
+
+    <div x-show="message" class="alert" :class="success ? 'alert-success' : 'alert-error'" x-text="message"></div>
+
+    <form @submit.prevent="saveConfig()">
+        <section class="settings-section">
+            <h3>General</h3>
+            <div class="form-group">
+                <label>LLM Provider</label>
+                <input type="text" :value="config.provider" disabled class="form-input masked">
+                <small class="form-hint">Change via LLM_PROVIDER environment variable</small>
+            </div>
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="text" value="••••••••••••" disabled class="form-input masked">
+                <small class="form-hint">Change via LLM_API_KEY environment variable</small>
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h3>Timeouts & Limits</h3>
+            <div class="form-group">
+                <label for="command_timeout">Command Timeout (seconds)</label>
+                <input type="number" id="command_timeout" x-model.number="config.command_timeout"
+                       min="1" max="300" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="scan_timeout">Network Scan Timeout (seconds)</label>
+                <input type="number" id="scan_timeout" x-model.number="config.scan_timeout"
+                       min="1" max="600" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="max_history_pairs">Max History Pairs</label>
+                <input type="number" id="max_history_pairs" x-model.number="config.max_history_pairs"
+                       min="1" max="50" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="reminder_window_minutes">Reminder Window (minutes)</label>
+                <input type="number" id="reminder_window_minutes" x-model.number="config.reminder_window_minutes"
+                       min="1" max="120" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="retention_days">Conversation Retention (days)</label>
+                <input type="number" id="retention_days" x-model.number="config.retention_days"
+                       min="1" max="365" class="form-input">
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h3>Integrations</h3>
+            <div class="form-group">
+                <label>Calendar Provider</label>
+                <input type="text" :value="config.calendar_provider || 'Not configured'" disabled class="form-input masked">
+                <small class="form-hint">Change via CALENDAR_PROVIDER environment variable</small>
+            </div>
+            <div class="form-group">
+                <label>Database Path</label>
+                <input type="text" :value="config.database_path" disabled class="form-input masked">
+                <small class="form-hint">Change via DATABASE_PATH environment variable</small>
+            </div>
+        </section>
+
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+    </form>
+
+    <!-- Server Management Section -->
+    <section class="settings-section" x-data="{restarting: false}">
+        <h3>🔄 Server Management</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Manually restart the backend server. The server will restart in 3 seconds after clicking.
+            Auto-reload is triggered when files in the <code>app/</code> folder are modified.
+        </p>
+        <button class="btn" style="background:var(--error);color:white;width:100%"
+                :disabled="restarting"
+                @click="restarting=true; fetch('/api/restart',{method:'POST'}).then(()=>{}).catch(()=>{})">
+            <span x-text="restarting ? '⏳ Restarting...' : '🔄 Restart Server'"></span>
+        </button>
+    </section>
+
+    <!-- Voice & Face Enrollment Section -->
+    <section class="settings-section" x-data="enrollmentApp()" x-init="checkStatus()">
+        <h3>🔐 Biometric Enrollment</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Enroll your voice and face for hands-free authentication. Once enrolled, Jarvis can identify you automatically.
+        </p>
+
+        <!-- Voice Enrollment -->
+        <div class="form-group" style="padding:0.75rem;background:var(--bg-input);border-radius:6px;margin-bottom:1rem">
+            <strong>🎤 Voice Enrollment</strong>
+            <span x-show="voiceEnrolled" style="color:var(--success);font-size:0.8rem;margin-left:0.5rem">✓ Enrolled</span>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin:0.3rem 0">
+                Record 3 voice samples saying "Hey Jarvis, this is my voice" to create your voice profile.
+            </p>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem">
+                <button class="btn" :class="voiceRecording ? 'btn-primary' : ''" @click="recordVoiceSample()"
+                        :disabled="voiceEnrolled" style="font-size:0.8rem">
+                    <span x-text="voiceRecording ? '⏹ Recording...' : '🎤 Record Sample (' + voiceSamples + '/3)'"></span>
+                </button>
+                <span x-show="voiceMsg" style="font-size:0.75rem;color:var(--accent)" x-text="voiceMsg"></span>
+            </div>
+        </div>
+
+        <!-- Face Enrollment -->
+        <div class="form-group" style="padding:0.75rem;background:var(--bg-input);border-radius:6px">
+            <strong>📷 Face Enrollment</strong>
+            <span x-show="faceEnrolled" style="color:var(--success);font-size:0.8rem;margin-left:0.5rem">✓ Enrolled</span>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin:0.3rem 0">
+                Look at the camera from 5 angles: front, up, down, left, right. Requires camera permission.
+            </p>
+            <div style="margin-top:0.5rem">
+                <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-bottom:0.5rem">
+                    <template x-for="angle in ['front','up','down','left','right']" :key="angle">
+                        <span style="font-size:0.7rem;padding:0.2rem 0.5rem;border-radius:4px"
+                              :style="faceAngles.includes(angle) ? 'background:var(--success);color:white' : 'background:var(--border);color:var(--text-muted)'"
+                              x-text="angle"></span>
+                    </template>
+                </div>
+                <button class="btn" @click="startFaceEnrollment()" :disabled="faceEnrolled" style="font-size:0.8rem">
+                    📷 Start Face Enrollment
+                </button>
+                <span x-show="faceMsg" style="font-size:0.75rem;color:var(--accent);margin-left:0.5rem" x-text="faceMsg"></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Device Permissions Section -->
+    <section class="settings-section" x-data="permissionsApp()" x-init="loadPrefs()">
+        <h3>📱 Device Permissions</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Grant browser permissions so Jarvis can access your device's sensors.
+            These are OFF by default and only active on this device.
+        </p>
+
+        <div class="form-group">
+            <label class="voice-toggle-label">
+                <input type="checkbox" x-model="perms.notifications" @change="toggleNotifications()">
+                🔔 Browser Notifications
+            </label>
+            <small class="form-hint">Receive push notifications for reminders even when the tab is in the background.</small>
+        </div>
+
+        <div class="form-group">
+            <label class="voice-toggle-label">
+                <input type="checkbox" x-model="perms.geolocation" @change="toggleGeolocation()">
+                📍 GPS Location
+            </label>
+            <small class="form-hint">Share your device's location with Jarvis. Updates every 30 seconds when enabled.</small>
+            <div x-show="perms.geolocation && lastLocation" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem">
+                Last: <span x-text="lastLocation"></span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="voice-toggle-label">
+                <input type="checkbox" x-model="perms.camera" @change="toggleCamera()">
+                📷 Camera Access
+            </label>
+            <small class="form-hint">Allow Jarvis to access your device camera (for future features like QR scanning).</small>
+        </div>
+
+        <div class="form-group">
+            <label class="voice-toggle-label">
+                <input type="checkbox" x-model="perms.microphone" @change="toggleMicrophone()">
+                🎤 Microphone Access
+            </label>
+            <small class="form-hint">Already used for voice input. Toggle OFF to revoke access.</small>
+        </div>
+    </section>
+
+    <!-- Inference Parameters Section -->
+    <section class="settings-section" x-data="inferenceApp()" x-init="fetchParams()">
+        <h3>🧠 LLM Inference Parameters</h3>
+        <div x-show="inferenceMsg" class="alert" :class="inferenceSuccess ? 'alert-success' : 'alert-error'" x-text="inferenceMsg"></div>
+
+        <div class="form-group">
+            <label>Temperature: <span x-text="params.temperature.toFixed(2)"></span></label>
+            <input type="range" min="0" max="2" step="0.05" x-model.number="params.temperature" class="voice-slider">
+            <small class="form-hint">Lower = more focused/deterministic. Higher = more creative/random.</small>
+        </div>
+        <div class="form-group">
+            <label>Top P: <span x-text="params.top_p.toFixed(2)"></span></label>
+            <input type="range" min="0" max="1" step="0.05" x-model.number="params.top_p" class="voice-slider">
+            <small class="form-hint">Nucleus sampling. 0.9 = consider top 90% probability mass.</small>
+        </div>
+        <div class="form-group">
+            <label>Max Tokens: <span x-text="params.max_tokens"></span></label>
+            <input type="range" min="128" max="4096" step="64" x-model.number="params.max_tokens" class="voice-slider">
+            <small class="form-hint">Maximum length of generated response.</small>
+        </div>
+        <div class="form-group">
+            <label>Frequency Penalty: <span x-text="params.frequency_penalty.toFixed(2)"></span></label>
+            <input type="range" min="-2" max="2" step="0.1" x-model.number="params.frequency_penalty" class="voice-slider">
+            <small class="form-hint">Positive = reduce repetition. Negative = allow repetition.</small>
+        </div>
+        <div class="form-group">
+            <label>Presence Penalty: <span x-text="params.presence_penalty.toFixed(2)"></span></label>
+            <input type="range" min="-2" max="2" step="0.1" x-model.number="params.presence_penalty" class="voice-slider">
+            <small class="form-hint">Positive = encourage new topics. Negative = stay on topic.</small>
+        </div>
+        <button class="btn btn-primary" style="width:100%" @click="saveParams()">Apply Inference Settings</button>
+    </section>
+
+    <!-- Daily Briefing Section -->
+    <section class="settings-section" x-data="briefingApp()" x-init="fetchSettings()">
+        <h3>☀️ Daily Briefing</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Receive a morning summary combining weather, calendar, notes, and metrics at a time of your choosing.
+        </p>
+        <div x-show="briefingMsg" class="alert" :class="briefingSuccess ? 'alert-success' : 'alert-error'" x-text="briefingMsg"></div>
+
+        <div class="form-group">
+            <label class="voice-toggle-label">
+                <input type="checkbox" x-model="settings.enabled">
+                Enable Daily Briefing
+            </label>
+        </div>
+        <div class="form-group">
+            <label for="briefing_time">Delivery Time</label>
+            <input type="time" id="briefing_time" x-model="settings.time" class="form-input" style="max-width:150px">
+        </div>
+        <div class="form-group">
+            <label for="briefing_city">Weather City (leave empty for default)</label>
+            <input type="text" id="briefing_city" x-model="settings.city" class="form-input" placeholder="e.g. Paris, London">
+        </div>
+        <div class="form-group">
+            <label>Include in briefing:</label>
+            <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-top:0.3rem">
+                <label class="voice-toggle-label"><input type="checkbox" x-model="settings.include_weather"> 🌡️ Weather</label>
+                <label class="voice-toggle-label"><input type="checkbox" x-model="settings.include_calendar"> 📆 Calendar</label>
+                <label class="voice-toggle-label"><input type="checkbox" x-model="settings.include_notes"> 📝 Notes</label>
+                <label class="voice-toggle-label"><input type="checkbox" x-model="settings.include_metrics"> 📊 Metrics</label>
+                <label class="voice-toggle-label"><input type="checkbox" x-model="settings.include_quote"> 💡 Quote</label>
+            </div>
+        </div>
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary" style="flex:1" @click="saveSettings()">Save Briefing Settings</button>
+            <button class="btn" style="background:var(--accent);color:white" @click="previewBriefing()">👁️ Preview</button>
+        </div>
+        <div x-show="preview" style="margin-top:1rem;padding:0.75rem;background:var(--bg-input);border-radius:6px;font-size:0.8rem;white-space:pre-wrap;max-height:300px;overflow-y:auto" x-text="preview"></div>
+    </section>
+
+    <!-- Code Sandbox Section -->
+    <section class="settings-section" x-data="sandboxApp()">
+        <h3>🐍 Code Sandbox</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Execute Python code in a restricted environment. Useful for quick calculations, data transformations, and prototyping.
+            Available modules: math, json, datetime, random, re, collections, itertools, functools.
+        </p>
+
+        <div class="form-group">
+            <label for="sandbox_code">Python Code</label>
+            <textarea id="sandbox_code" x-model="code" class="form-input" rows="8"
+                      style="font-family:monospace;font-size:0.85rem;resize:vertical"
+                      placeholder="# Example: calculate compound interest&#10;principal = 1000&#10;rate = 0.05&#10;years = 10&#10;result = principal * (1 + rate) ** years&#10;print(f'After {years} years: ${result:.2f}')"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Timeout: <span x-text="timeout + 's'"></span></label>
+            <input type="range" min="1" max="30" step="1" x-model.number="timeout" class="voice-slider">
+        </div>
+        <button class="btn btn-primary" style="width:100%" @click="runCode()" :disabled="running">
+            <span x-text="running ? '⏳ Running...' : '▶️ Execute Code'"></span>
+        </button>
+        <div x-show="output || error || result" style="margin-top:1rem;padding:0.75rem;background:var(--bg-input);border-radius:6px;font-family:monospace;font-size:0.8rem;white-space:pre-wrap;max-height:250px;overflow-y:auto">
+            <div x-show="output" style="color:var(--text-primary)" x-text="output"></div>
+            <div x-show="result" style="color:var(--accent);margin-top:0.3rem">→ <span x-text="result"></span></div>
+            <div x-show="error" style="color:var(--error);margin-top:0.3rem" x-text="error"></div>
+        </div>
+    </section>
+
+    <!-- Workflow Automation Section -->
+    <section class="settings-section" x-data="workflowApp()" x-init="fetchWorkflows()">
+        <h3>⚡ Workflow Automation</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Define trigger→action rules that automate tasks. Examples: "Every weekday at 8am, deliver my briefing" or "When I arrive home, turn on the lights."
+        </p>
+        <div x-show="wfMsg" class="alert" :class="wfSuccess ? 'alert-success' : 'alert-error'" x-text="wfMsg"></div>
+
+        <!-- Existing Workflows -->
+        <div x-show="workflows.length > 0" style="margin-bottom:1rem">
+            <template x-for="wf in workflows" :key="wf.id">
+                <div style="padding:0.6rem;background:var(--bg-input);border-radius:6px;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem">
+                    <span style="font-size:1.1rem" x-text="wf.enabled ? '✓' : '✗'"></span>
+                    <div style="flex:1">
+                        <strong x-text="wf.name" style="font-size:0.85rem"></strong>
+                        <div style="font-size:0.75rem;color:var(--text-muted)" x-text="wf.trigger_type + ' → ' + wf.action_type"></div>
+                    </div>
+                    <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="toggleWorkflow(wf)">
+                        <span x-text="wf.enabled ? 'Disable' : 'Enable'"></span>
+                    </button>
+                    <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="testWorkflow(wf.id)">Test</button>
+                    <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:var(--error);color:white" @click="deleteWorkflow(wf.id)">✕</button>
+                </div>
+            </template>
+        </div>
+        <div x-show="workflows.length === 0" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            No workflows configured yet.
+        </div>
+
+        <!-- Create New Workflow -->
+        <details style="margin-top:0.5rem">
+            <summary style="cursor:pointer;font-weight:600;font-size:0.9rem">➕ Create New Workflow</summary>
+            <div style="margin-top:0.75rem">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" x-model="newWf.name" class="form-input" placeholder="e.g. Morning Briefing">
+                </div>
+                <div class="form-group">
+                    <label>Trigger Type</label>
+                    <select x-model="newWf.trigger_type" class="form-input" @change="updateTriggerTemplate()">
+                        <option value="schedule">⏰ Schedule (time-based)</option>
+                        <option value="gps_enter">📍 GPS Enter Zone</option>
+                        <option value="gps_exit">📍 GPS Exit Zone</option>
+                        <option value="event">🔔 System Event</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Trigger Config (JSON)</label>
+                    <textarea x-model="newWf.trigger_config_str" class="form-input" rows="3"
+                              style="font-family:monospace;font-size:0.8rem"></textarea>
+                    <small class="form-hint" x-text="triggerHint"></small>
+                </div>
+                <div class="form-group">
+                    <label>Action Type</label>
+                    <select x-model="newWf.action_type" class="form-input" @change="updateActionTemplate()">
+                        <option value="notify">💬 Send Notification</option>
+                        <option value="run_command">⚙️ Run Command</option>
+                        <option value="briefing">☀️ Deliver Briefing</option>
+                        <option value="smart_home">🏠 Smart Home Control</option>
+                        <option value="note">📝 Create Note</option>
+                        <option value="webhook">🌐 Call Webhook</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Action Config (JSON)</label>
+                    <textarea x-model="newWf.action_config_str" class="form-input" rows="3"
+                              style="font-family:monospace;font-size:0.8rem"></textarea>
+                    <small class="form-hint" x-text="actionHint"></small>
+                </div>
+                <button class="btn btn-primary" style="width:100%" @click="createWorkflow()">Create Workflow</button>
+            </div>
+        </details>
+    </section>
+
+    <!-- Contextual Suggestions Section -->
+    <section class="settings-section" x-data="suggestionsApp()" x-init="fetchStats()">
+        <h3>🧠 Contextual Suggestions</h3>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            Jarvis monitors your usage patterns and suggests automations for repetitive tasks.
+            It reads your OS command history and tracks tool usage to detect optimizable patterns.
+        </p>
+        <div x-show="sugMsg" class="alert" :class="sugSuccess ? 'alert-success' : 'alert-error'" x-text="sugMsg"></div>
+
+        <!-- Activity Stats -->
+        <div x-show="stats.total_activities_7d > 0" style="margin-bottom:1rem">
+            <strong style="font-size:0.85rem">📊 Activity (last 7 days): <span x-text="stats.total_activities_7d"></span> tracked actions</strong>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
+                <template x-for="(count, type) in stats.by_type" :key="type">
+                    <span style="font-size:0.75rem;padding:0.2rem 0.5rem;background:var(--bg-input);border-radius:4px"
+                          x-text="type + ': ' + count"></span>
+                </template>
+            </div>
+            <div x-show="stats.top_commands.length > 0" style="margin-top:0.75rem">
+                <strong style="font-size:0.8rem">Top commands:</strong>
+                <div style="margin-top:0.3rem">
+                    <template x-for="cmd in stats.top_commands.slice(0, 5)" :key="cmd.command">
+                        <div style="font-size:0.75rem;padding:0.2rem 0;font-family:monospace;color:var(--text-muted)">
+                            <span x-text="'×' + cmd.count"></span> — <span x-text="cmd.command.substring(0, 80)"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        <div x-show="stats.total_activities_7d === 0" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+            No activity tracked yet. Use Jarvis normally and patterns will be detected over time.
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn" style="font-size:0.8rem" @click="ingestHistory()" :disabled="ingesting">
+                <span x-text="ingesting ? '⏳ Reading...' : '📥 Import OS History'"></span>
+            </button>
+            <button class="btn" style="font-size:0.8rem" @click="checkSuggestions()">
+                🔍 Check for Suggestions
+            </button>
+        </div>
+
+        <!-- Current Suggestions -->
+        <div x-show="suggestions.length > 0" style="margin-top:1rem">
+            <strong style="font-size:0.85rem">💡 Current Suggestions:</strong>
+            <template x-for="sug in suggestions" :key="sug.pattern_key">
+                <div style="padding:0.6rem;background:var(--bg-input);border-radius:6px;margin-top:0.5rem;font-size:0.8rem">
+                    <div style="font-weight:600;margin-bottom:0.3rem" x-text="sug.title"></div>
+                    <div style="white-space:pre-wrap;color:var(--text-muted)" x-text="sug.message"></div>
+                </div>
+            </template>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function settingsApp() {
+    return {
+        config: {},
+        message: '',
+        success: false,
+
+        async fetchConfig() {
+            try {
+                const resp = await fetch('/api/config');
+                this.config = await resp.json();
+            } catch (e) {
+                this.message = 'Failed to load configuration.';
+                this.success = false;
+            }
+        },
+
+        async saveConfig() {
+            this.message = '';
+            const updatable = ['command_timeout', 'scan_timeout', 'max_history_pairs', 'reminder_window_minutes', 'retention_days'];
+            let allSuccess = true;
+
+            for (const key of updatable) {
+                if (this.config[key] !== undefined) {
+                    try {
+                        const resp = await fetch('/api/config', {
+                            method: 'PUT',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({key: key, value: this.config[key]})
+                        });
+                        if (!resp.ok) {
+                            const data = await resp.json();
+                            this.message = data.error || 'Failed to update ' + key;
+                            this.success = false;
+                            allSuccess = false;
+                            break;
+                        }
+                    } catch (e) {
+                        this.message = 'Network error while saving.';
+                        this.success = false;
+                        allSuccess = false;
+                        break;
+                    }
+                }
+            }
+
+            if (allSuccess) {
+                this.message = 'Configuration saved successfully.';
+                this.success = true;
+                setTimeout(() => this.message = '', 3000);
+            }
+        }
+    }
+}
+
+function enrollmentApp() {
+    return {
+        voiceEnrolled: false,
+        voiceSamples: 0,
+        voiceRecording: false,
+        voiceMsg: '',
+        faceEnrolled: false,
+        faceAngles: [],
+        faceMsg: '',
+
+        async checkStatus() {
+            // Check voice status
+            try {
+                const r = await fetch('/api/user/preferences');
+                if (r.ok) {
+                    const prefs = await r.json();
+                    this.voiceEnrolled = prefs.voice_enrolled === true || prefs.voice_enrolled === 'true';
+                }
+            } catch(e) {}
+            // Check face status
+            try {
+                const r = await fetch('/api/user/face-status');
+                if (r.ok) {
+                    const data = await r.json();
+                    this.faceEnrolled = data.enrolled;
+                    this.faceAngles = data.angles || [];
+                }
+            } catch(e) {}
+        },
+
+        async recordVoiceSample() {
+            if (this.voiceRecording) return;
+            this.voiceRecording = true;
+            this.voiceMsg = 'Listening... Say "Hey Jarvis, this is my voice"';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+                const audioCtx = new AudioContext();
+                const source = audioCtx.createMediaStreamSource(stream);
+                const analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                // Record for 3 seconds
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Extract basic features (pitch approximation, energy)
+                const dataArray = new Float32Array(analyser.frequencyBinCount);
+                analyser.getFloatFrequencyData(dataArray);
+
+                const features = {
+                    avg_energy: dataArray.reduce((a, b) => a + b, 0) / dataArray.length,
+                    peak_freq: dataArray.indexOf(Math.max(...dataArray)),
+                    spectral_centroid: dataArray.reduce((sum, val, i) => sum + val * i, 0) / dataArray.reduce((a, b) => a + b, 1),
+                    low_band: dataArray.slice(0, 100).reduce((a, b) => a + b, 0) / 100,
+                    mid_band: dataArray.slice(100, 500).reduce((a, b) => a + b, 0) / 400,
+                    high_band: dataArray.slice(500).reduce((a, b) => a + b, 0) / (dataArray.length - 500),
+                };
+
+                stream.getTracks().forEach(t => t.stop());
+                audioCtx.close();
+
+                // Submit to server
+                const r = await fetch('/api/user/voice-enroll', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({features})
+                });
+                const data = await r.json();
+                this.voiceMsg = data.message;
+                this.voiceSamples = data.sample_count || 0;
+                this.voiceEnrolled = data.enrolled || false;
+            } catch(e) {
+                this.voiceMsg = 'Error: ' + e.message;
+            }
+            this.voiceRecording = false;
+            setTimeout(() => this.voiceMsg = '', 5000);
+        },
+
+        async startFaceEnrollment() {
+            this.faceMsg = 'Face enrollment requires face-api.js. Loading...';
+            // Note: Full implementation requires face-api.js loaded from CDN
+            // For now, provide instructions
+            this.faceMsg = 'Face enrollment UI coming soon. Use POST /api/user/face-enroll API directly.';
+            setTimeout(() => this.faceMsg = '', 5000);
+        }
+    }
+}
+
+function permissionsApp() {
+    return {
+        perms: {notifications: false, geolocation: false, camera: false, microphone: false},
+        lastLocation: '',
+        geoWatchId: null,
+        deviceId: localStorage.getItem('jarvis_device_id') || ('device_' + Math.random().toString(36).substr(2, 8)),
+
+        loadPrefs() {
+            localStorage.setItem('jarvis_device_id', this.deviceId);
+            const saved = JSON.parse(localStorage.getItem('jarvis_permissions') || '{}');
+            this.perms = {...this.perms, ...saved};
+            // Re-activate geolocation if it was on
+            if (this.perms.geolocation) this.startGeolocation();
+        },
+
+        savePrefs() {
+            localStorage.setItem('jarvis_permissions', JSON.stringify(this.perms));
+        },
+
+        async toggleNotifications() {
+            if (this.perms.notifications) {
+                if ('Notification' in window) {
+                    const perm = await Notification.requestPermission();
+                    if (perm !== 'granted') {
+                        this.perms.notifications = false;
+                        alert('Notification permission denied by browser.');
+                    }
+                }
+            }
+            this.savePrefs();
+        },
+
+        toggleGeolocation() {
+            if (this.perms.geolocation) {
+                this.startGeolocation();
+            } else {
+                this.stopGeolocation();
+            }
+            this.savePrefs();
+        },
+
+        startGeolocation() {
+            if (!navigator.geolocation) {
+                alert('Geolocation not supported by this browser.');
+                this.perms.geolocation = false;
+                return;
+            }
+            // Send location every 30 seconds
+            const sendLocation = (pos) => {
+                this.lastLocation = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (±${pos.coords.accuracy?.toFixed(0) || '?'}m)`;
+                fetch('/api/device/location', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                        accuracy: pos.coords.accuracy,
+                        device_id: this.deviceId,
+                        timestamp: new Date().toISOString()
+                    })
+                }).catch(() => {});
+            };
+            this.geoWatchId = navigator.geolocation.watchPosition(sendLocation, (err) => {
+                console.warn('Geolocation error:', err);
+                this.lastLocation = 'Error: ' + err.message;
+            }, {enableHighAccuracy: true, maximumAge: 30000});
+        },
+
+        stopGeolocation() {
+            if (this.geoWatchId !== null) {
+                navigator.geolocation.clearWatch(this.geoWatchId);
+                this.geoWatchId = null;
+            }
+            this.lastLocation = '';
+        },
+
+        async toggleCamera() {
+            if (this.perms.camera) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({video: true});
+                    stream.getTracks().forEach(t => t.stop()); // Just request permission, don't keep stream
+                } catch (e) {
+                    this.perms.camera = false;
+                    alert('Camera permission denied: ' + e.message);
+                }
+            }
+            this.savePrefs();
+        },
+
+        async toggleMicrophone() {
+            if (this.perms.microphone) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+                    stream.getTracks().forEach(t => t.stop());
+                } catch (e) {
+                    this.perms.microphone = false;
+                    alert('Microphone permission denied: ' + e.message);
+                }
+            }
+            this.savePrefs();
+        }
+    }
+}
+
+function inferenceApp() {
+    return {
+        params: {temperature: 0.7, top_p: 0.9, max_tokens: 1024, frequency_penalty: 0.0, presence_penalty: 0.0},
+        inferenceMsg: '',
+        inferenceSuccess: false,
+
+        async fetchParams() {
+            try {
+                const resp = await fetch('/api/inference');
+                if (resp.ok) this.params = await resp.json();
+            } catch (e) {}
+        },
+
+        async saveParams() {
+            this.inferenceMsg = '';
+            try {
+                const resp = await fetch('/api/inference', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.params)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.inferenceMsg = 'Inference parameters applied.';
+                    this.inferenceSuccess = true;
+                } else {
+                    this.inferenceMsg = data.error || 'Failed to update.';
+                    this.inferenceSuccess = false;
+                }
+                setTimeout(() => this.inferenceMsg = '', 4000);
+            } catch (e) {
+                this.inferenceMsg = 'Network error.';
+                this.inferenceSuccess = false;
+            }
+        }
+    }
+}
+
+function briefingApp() {
+    return {
+        settings: {
+            enabled: true, time: '08:00', include_weather: true,
+            include_calendar: true, include_notes: true,
+            include_metrics: true, include_quote: true, city: ''
+        },
+        briefingMsg: '',
+        briefingSuccess: false,
+        preview: '',
+
+        async fetchSettings() {
+            try {
+                const resp = await fetch('/api/briefing/settings');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.settings = {...this.settings, ...data};
+                    if (!this.settings.city) this.settings.city = '';
+                }
+            } catch (e) {}
+        },
+
+        async saveSettings() {
+            this.briefingMsg = '';
+            try {
+                const resp = await fetch('/api/briefing/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.settings)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.briefingMsg = 'Briefing settings saved.';
+                    this.briefingSuccess = true;
+                } else {
+                    this.briefingMsg = data.error || 'Failed to save.';
+                    this.briefingSuccess = false;
+                }
+                setTimeout(() => this.briefingMsg = '', 4000);
+            } catch (e) {
+                this.briefingMsg = 'Network error.';
+                this.briefingSuccess = false;
+            }
+        },
+
+        async previewBriefing() {
+            this.preview = 'Loading...';
+            try {
+                const resp = await fetch('/api/briefing');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.preview = data.briefing || 'No briefing generated.';
+                } else {
+                    this.preview = 'Failed to generate preview.';
+                }
+            } catch (e) {
+                this.preview = 'Network error.';
+            }
+        }
+    }
+}
+
+function sandboxApp() {
+    return {
+        code: '',
+        timeout: 10,
+        running: false,
+        output: '',
+        error: '',
+        result: '',
+
+        async runCode() {
+            if (!this.code.trim()) return;
+            this.running = true;
+            this.output = '';
+            this.error = '';
+            this.result = '';
+            try {
+                const resp = await fetch('/api/sandbox/run', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({code: this.code, timeout: this.timeout})
+                });
+                const data = await resp.json();
+                this.output = data.output || '';
+                this.error = data.error || '';
+                this.result = data.result || '';
+            } catch (e) {
+                this.error = 'Network error: ' + e.message;
+            }
+            this.running = false;
+        }
+    }
+}
+
+function workflowApp() {
+    return {
+        workflows: [],
+        wfMsg: '',
+        wfSuccess: false,
+        triggerHint: '',
+        actionHint: '',
+        newWf: {
+            name: '',
+            trigger_type: 'schedule',
+            trigger_config_str: '{"time": "08:00", "days": "weekdays"}',
+            action_type: 'notify',
+            action_config_str: '{"message": "Good morning! Time to start the day."}'
+        },
+
+        async fetchWorkflows() {
+            try {
+                const resp = await fetch('/api/workflows');
+                if (resp.ok) this.workflows = await resp.json();
+            } catch (e) {}
+            this.updateTriggerTemplate();
+            this.updateActionTemplate();
+        },
+
+        updateTriggerTemplate() {
+            const templates = {
+                schedule: '{"time": "08:00", "days": "weekdays"}',
+                gps_enter: '{"latitude": 48.8566, "longitude": 2.3522, "radius_meters": 100}',
+                gps_exit: '{"latitude": 48.8566, "longitude": 2.3522, "radius_meters": 100}',
+                event: '{"event_name": "reminder_fired"}'
+            };
+            const hints = {
+                schedule: 'days: "daily", "weekdays", "weekends", or ["mon","tue",...]. Or use interval: "every 5m"',
+                gps_enter: 'Set lat/lon of the zone center and radius in meters.',
+                gps_exit: 'Set lat/lon of the zone center and radius in meters.',
+                event: 'event_name: "reminder_fired", "command_completed", etc.'
+            };
+            if (!this.newWf.trigger_config_str || this.newWf.trigger_config_str.includes('"time"') || this.newWf.trigger_config_str.includes('"latitude"') || this.newWf.trigger_config_str.includes('"event_name"')) {
+                this.newWf.trigger_config_str = templates[this.newWf.trigger_type] || '{}';
+            }
+            this.triggerHint = hints[this.newWf.trigger_type] || '';
+        },
+
+        updateActionTemplate() {
+            const templates = {
+                notify: '{"message": "Hello from your workflow!"}',
+                run_command: '{"command": "echo hello", "notify_output": true}',
+                briefing: '{}',
+                smart_home: '{"action": "turn_on", "entity_id": "light.living_room"}',
+                note: '{"content": "Auto-generated note at {time}"}',
+                webhook: '{"url": "https://example.com/hook", "method": "POST"}'
+            };
+            const hints = {
+                notify: 'Variables: {time}, {date}, {workflow_name}',
+                run_command: 'notify_output: true to push command output as notification',
+                briefing: 'No config needed — generates full briefing',
+                smart_home: 'action: turn_on, turn_off, set_color. brightness: 0-255',
+                note: 'Variables: {time}, {date}. Optional: category',
+                webhook: 'method: GET/POST. Optional: payload (JSON object)'
+            };
+            if (!this.newWf.action_config_str || this.newWf.action_config_str.includes('"message"') || this.newWf.action_config_str.includes('"command"') || this.newWf.action_config_str === '{}') {
+                this.newWf.action_config_str = templates[this.newWf.action_type] || '{}';
+            }
+            this.actionHint = hints[this.newWf.action_type] || '';
+        },
+
+        async createWorkflow() {
+            this.wfMsg = '';
+            let triggerConfig, actionConfig;
+            try {
+                triggerConfig = JSON.parse(this.newWf.trigger_config_str);
+            } catch (e) {
+                this.wfMsg = 'Invalid trigger config JSON: ' + e.message;
+                this.wfSuccess = false;
+                return;
+            }
+            try {
+                actionConfig = JSON.parse(this.newWf.action_config_str);
+            } catch (e) {
+                this.wfMsg = 'Invalid action config JSON: ' + e.message;
+                this.wfSuccess = false;
+                return;
+            }
+            if (!this.newWf.name.trim()) {
+                this.wfMsg = 'Please provide a workflow name.';
+                this.wfSuccess = false;
+                return;
+            }
+            try {
+                const resp = await fetch('/api/workflows', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: this.newWf.name,
+                        trigger_type: this.newWf.trigger_type,
+                        trigger_config: triggerConfig,
+                        action_type: this.newWf.action_type,
+                        action_config: actionConfig
+                    })
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.wfMsg = data.message || 'Workflow created!';
+                    this.wfSuccess = true;
+                    this.newWf.name = '';
+                    this.fetchWorkflows();
+                } else {
+                    this.wfMsg = data.error || 'Failed to create workflow.';
+                    this.wfSuccess = false;
+                }
+                setTimeout(() => this.wfMsg = '', 5000);
+            } catch (e) {
+                this.wfMsg = 'Network error.';
+                this.wfSuccess = false;
+            }
+        },
+
+        async toggleWorkflow(wf) {
+            try {
+                await fetch(`/api/workflows/${wf.id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: !wf.enabled})
+                });
+                this.fetchWorkflows();
+            } catch (e) {}
+        },
+
+        async testWorkflow(id) {
+            try {
+                const resp = await fetch(`/api/workflows/${id}/test`, {method: 'POST'});
+                const data = await resp.json();
+                this.wfMsg = data.message || 'Triggered!';
+                this.wfSuccess = true;
+                setTimeout(() => this.wfMsg = '', 4000);
+            } catch (e) {
+                this.wfMsg = 'Failed to test workflow.';
+                this.wfSuccess = false;
+            }
+        },
+
+        async deleteWorkflow(id) {
+            if (!confirm('Delete this workflow?')) return;
+            try {
+                await fetch(`/api/workflows/${id}`, {method: 'DELETE'});
+                this.fetchWorkflows();
+            } catch (e) {}
+        }
+    }
+}
+
+function suggestionsApp() {
+    return {
+        stats: {total_activities_7d: 0, by_type: {}, top_commands: [], peak_hours: []},
+        suggestions: [],
+        sugMsg: '',
+        sugSuccess: false,
+        ingesting: false,
+
+        async fetchStats() {
+            try {
+                const resp = await fetch('/api/suggestions/activity');
+                if (resp.ok) this.stats = await resp.json();
+            } catch (e) {}
+        },
+
+        async ingestHistory() {
+            this.ingesting = true;
+            this.sugMsg = '';
+            try {
+                const resp = await fetch('/api/suggestions/ingest-history', {method: 'POST'});
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.sugMsg = `Imported ${data.ingested} new commands from OS history (${data.total_read} total read).`;
+                    this.sugSuccess = true;
+                    this.fetchStats();
+                } else {
+                    this.sugMsg = data.error || 'Failed to ingest history.';
+                    this.sugSuccess = false;
+                }
+                setTimeout(() => this.sugMsg = '', 5000);
+            } catch (e) {
+                this.sugMsg = 'Network error.';
+                this.sugSuccess = false;
+            }
+            this.ingesting = false;
+        },
+
+        async checkSuggestions() {
+            this.sugMsg = '';
+            try {
+                const resp = await fetch('/api/suggestions');
+                if (resp.ok) {
+                    this.suggestions = await resp.json();
+                    if (this.suggestions.length === 0) {
+                        this.sugMsg = 'No suggestions at this time. Keep using Jarvis and patterns will emerge.';
+                        this.sugSuccess = true;
+                        setTimeout(() => this.sugMsg = '', 4000);
+                    }
+                }
+            } catch (e) {
+                this.sugMsg = 'Network error.';
+                this.sugSuccess = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

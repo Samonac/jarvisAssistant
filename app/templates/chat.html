@@ -1,0 +1,1043 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Chat{% endblock %}
+
+{% block content %}
+<div class="chat-layout" x-data="chatApp()" x-init="init()">
+
+    <!-- Sidebar: Conversation History -->
+    <aside class="chat-sidebar" :class="{'sidebar-open': sidebarOpen}">
+        <div class="sidebar-header">
+            <h3>Conversations</h3>
+            <button class="btn-new-chat" @click="newChat()" title="New conversation">+</button>
+        </div>
+        <!-- Search bar -->
+        <div class="sidebar-search">
+            <input type="text" x-model="searchQuery" @input.debounce.300ms="searchConversations()"
+                   placeholder="Search conversations..." class="search-input">
+        </div>
+        <!-- Search results -->
+        <div class="sidebar-sessions" x-show="searchQuery && searchResults.length > 0">
+            <template x-for="r in searchResults" :key="r.session_id + r.timestamp">
+                <div class="session-item" @click="loadSession(r.session_id)">
+                    <div class="session-preview" x-text="r.title || r.content.substring(0, 60)"></div>
+                    <div class="session-meta">
+                        <span x-text="r.role === 'user' ? '👤' : '🤖'"></span>
+                        <span x-text="formatDate(r.timestamp)"></span>
+                    </div>
+                    <div class="search-snippet" x-text="highlightSnippet(r.content, searchQuery)"></div>
+                </div>
+            </template>
+        </div>
+        <div x-show="searchQuery && searchResults.length === 0" class="text-muted sidebar-empty">No results found.</div>
+        <!-- Normal session list (hidden during search) -->
+        <div class="sidebar-sessions" x-show="!searchQuery">
+            <template x-for="s in sessions" :key="s.session_id">
+                <div class="session-item" :class="{'session-active': s.session_id === sessionId}"
+                     @click="loadSession(s.session_id)">
+                    <div class="session-preview" x-text="s.title || s.preview"></div>
+                    <div class="session-meta" x-text="formatDate(s.last_active)"></div>
+                </div>
+            </template>
+            <p x-show="sessions.length === 0" class="text-muted sidebar-empty">No conversations yet.</p>
+        </div>
+    </aside>
+
+    <!-- Toggle button for mobile -->
+    <button class="sidebar-toggle" @click="sidebarOpen = !sidebarOpen">
+        <span x-text="sidebarOpen ? '✕' : '☰'"></span>
+    </button>
+
+    <!-- Main Chat Area -->
+    <div class="chat-main">
+        <!-- Toolbar: Assistant selector + Export -->
+        <div class="chat-toolbar">
+            <div style="display:flex;align-items:center;gap:0.5rem">
+                <select x-model="selectedAssistantId" @change="onAssistantChange()" class="assistant-selector"
+                        title="Select assistant personality">
+                    <option value="">⚡ J.A.R.V.I.S. (default)</option>
+                    <template x-for="a in assistants" :key="a.id">
+                        <option :value="a.id" x-text="a.icon + ' ' + a.name"></option>
+                    </template>
+                </select>
+                <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="showAssistantManager = true" title="Manage assistants">⚙️</button>
+            </div>
+            <div x-show="sessionId" class="export-dropdown" @click.outside="showExportMenu = false">
+                <button class="btn-export" @click="showExportMenu = !showExportMenu" title="Export conversation">
+                    📥 Export
+                </button>
+                <div class="export-menu" x-show="showExportMenu" x-transition>
+                    <a :href="'/api/sessions/' + sessionId + '/export'" class="export-option" @click="showExportMenu = false">
+                        📊 Download as XLSX
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            <template x-for="msg in messages" :key="msg.id">
+                <div :class="'message message-' + msg.role">
+                    <div class="message-content" x-text="msg.content"
+                         :style="msg.role === 'thinking' ? 'white-space: pre-wrap' : ''"></div>
+                    <!-- Reminder quick action buttons (only for reminder notifications) -->
+                    <div class="reminder-actions" x-show="msg.isReminder === true && msg.noteId" x-cloak>
+                        <button class="btn-reminder-action btn-done" @click="acknowledgeReminder(msg.noteId, msg.id)">✓ Done</button>
+                        <div class="snooze-dropdown" x-data="{open: false}">
+                            <button class="btn-reminder-action btn-snooze" @click="open = !open">⏰ Snooze ▾</button>
+                            <div x-show="open" @click.away="open = false" class="snooze-menu">
+                                <button @click="snoozeReminder(msg.noteId, 1, msg.id); open=false">1 min</button>
+                                <button @click="snoozeReminder(msg.noteId, 5, msg.id); open=false">5 min</button>
+                                <button @click="snoozeReminder(msg.noteId, 10, msg.id); open=false">10 min</button>
+                                <button @click="snoozeReminder(msg.noteId, 30, msg.id); open=false">30 min</button>
+                                <button @click="snoozeReminder(msg.noteId, 60, msg.id); open=false">1 hour</button>
+                                <button @click="snoozeReminder(msg.noteId, 120, msg.id); open=false">2 hours</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="message-timestamp" x-show="msg.timestamp" x-text="msg.timestamp"></div>
+                </div>
+            </template>
+            <div x-show="loading" class="message message-assistant">
+                <div class="message-content loading-indicator">
+                    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voice command feedback -->
+        <div x-show="voiceCmdFeedback" class="voice-cmd-feedback" x-text="voiceCmdFeedback"></div>
+
+        <form class="chat-input-form" @submit.prevent="sendMessage()">
+            <button type="button" class="btn btn-voice" @click="toggleVoiceInput()"
+                    :class="{'btn-voice-active': isListening}" title="Voice input (hold to speak)">
+                <span x-text="isListening ? '⏹' : '🎤'"></span>
+            </button>
+            <!-- Attachment button -->
+            <button type="button" class="btn btn-attach" @click="showAttachMenu = !showAttachMenu" title="Attach file or URL">
+                <span>📎</span>
+                <span x-show="attachments.length" class="attach-badge" x-text="attachments.length"></span>
+            </button>
+            <textarea x-model="input" placeholder="Speak to Jarvis... (Shift+Enter for new line, ↑↓ for history)"
+                   class="chat-input" :disabled="loading" autofocus
+                   x-ref="chatInput" rows="1"
+                   @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); sendMessage(); }"
+                   @keydown.up="if (!$event.shiftKey && !input.includes('\n')) { $event.preventDefault(); navigateHistory('up'); }"
+                   @keydown.down="if (!$event.shiftKey && !input.includes('\n')) { $event.preventDefault(); navigateHistory('down'); }"
+                   @input="autoResize($event.target)"></textarea>
+            <button type="button" class="btn btn-tts"
+                    @click="ttsEnabled = !ttsEnabled; saveTtsPrefs()"
+                    :class="{'btn-tts-active': ttsEnabled}" title="Toggle voice output">
+                <span x-text="ttsEnabled ? '🔊' : '🔇'"></span>
+            </button>
+            <button type="button" class="btn btn-voice-settings"
+                    @click="showVoicePanel = !showVoicePanel" title="Voice settings">⚙️</button>
+            <button type="submit" class="btn btn-primary" :disabled="loading || !input.trim()">
+                Send
+            </button>
+        </form>
+
+        <!-- Attachment chips (show attached items) -->
+        <div class="attach-chips" x-show="attachments.length > 0">
+            <template x-for="(att, idx) in attachments" :key="idx">
+                <div class="attach-chip">
+                    <span x-text="att.type === 'file' ? '📄' : '🔗'"></span>
+                    <span class="attach-chip-name" x-text="att.name"></span>
+                    <button class="attach-chip-remove" @click="attachments.splice(idx, 1)">✕</button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Attachment menu -->
+        <div class="attach-menu" x-show="showAttachMenu" x-transition @click.outside="showAttachMenu = false">
+            <div class="attach-option" @click="triggerFileUpload()">
+                📄 Upload File
+                <small>PDF, TXT, DOCX, code files, etc.</small>
+            </div>
+            <div class="attach-option" @click="promptUrl()">
+                🔗 Add URL
+                <small>Fetch content from a web page</small>
+            </div>
+            <input type="file" x-ref="fileInput" style="display:none"
+                   @change="handleFileUpload($event)">
+        </div>
+
+        <!-- Voice Settings Panel -->
+        <div class="voice-panel" x-show="showVoicePanel" x-transition>
+            <div class="voice-panel-header">
+                <strong>🎙️ Voice Settings</strong>
+                <button @click="showVoicePanel = false" class="btn-close-panel">✕</button>
+            </div>
+
+            <div class="voice-panel-body">
+                <!-- STT Language -->
+                <div class="voice-row">
+                    <label>Recognition Language</label>
+                    <select x-model="sttLang" @change="saveTtsPrefs()" class="voice-select">
+                        <option value="en-GB">English (UK)</option>
+                        <option value="en-US">English (US)</option>
+                        <option value="fr-FR">Français</option>
+                        <option value="de-DE">Deutsch</option>
+                        <option value="es-ES">Español</option>
+                        <option value="it-IT">Italiano</option>
+                        <option value="pt-PT">Português</option>
+                        <option value="ja-JP">日本語</option>
+                        <option value="zh-CN">中文</option>
+                    </select>
+                </div>
+
+                <!-- TTS Voice -->
+                <div class="voice-row">
+                    <label>Voice</label>
+                    <select x-model="selectedVoiceName" @change="applyVoiceSelection(); saveTtsPrefs()" class="voice-select">
+                        <template x-for="v in availableVoices" :key="v.name">
+                            <option :value="v.name" x-text="v.name + ' (' + v.lang + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Rate -->
+                <div class="voice-row">
+                    <label>Speed: <span x-text="speechRate.toFixed(1)"></span>x</label>
+                    <input type="range" min="0.5" max="2" step="0.05"
+                           x-model.number="speechRate" @change="saveTtsPrefs()" class="voice-slider">
+                </div>
+
+                <!-- Pitch -->
+                <div class="voice-row">
+                    <label>Pitch: <span x-text="speechPitch.toFixed(1)"></span></label>
+                    <input type="range" min="0.5" max="2" step="0.05"
+                           x-model.number="speechPitch" @change="saveTtsPrefs()" class="voice-slider">
+                </div>
+
+                <!-- Test button -->
+        <button class="btn btn-primary" style="width:100%;margin-top:0.5rem"
+                        @click="speak('Good evening, Sir. All systems are fully operational.')">
+                    🔊 Test Voice
+                </button>
+
+                <!-- Inference Parameters -->
+                <div class="voice-commands-section">
+                    <strong>🧠 LLM Parameters</strong>
+                    <div class="voice-row" style="margin-top:0.5rem">
+                        <label>Temperature: <span x-text="inferenceParams.temperature.toFixed(2)"></span></label>
+                        <input type="range" min="0" max="2" step="0.05" x-model.number="inferenceParams.temperature"
+                               @change="saveInferenceParams()" class="voice-slider">
+                    </div>
+                    <div class="voice-row">
+                        <label>Top P: <span x-text="inferenceParams.top_p.toFixed(2)"></span></label>
+                        <input type="range" min="0" max="1" step="0.05" x-model.number="inferenceParams.top_p"
+                               @change="saveInferenceParams()" class="voice-slider">
+                    </div>
+                    <div class="voice-row">
+                        <label>Max Tokens: <span x-text="inferenceParams.max_tokens"></span></label>
+                        <input type="range" min="128" max="4096" step="64" x-model.number="inferenceParams.max_tokens"
+                               @change="saveInferenceParams()" class="voice-slider">
+                    </div>
+                    <div class="voice-row">
+                        <label>Freq Penalty: <span x-text="inferenceParams.frequency_penalty.toFixed(1)"></span></label>
+                        <input type="range" min="-2" max="2" step="0.1" x-model.number="inferenceParams.frequency_penalty"
+                               @change="saveInferenceParams()" class="voice-slider">
+                    </div>
+                    <div class="voice-row">
+                        <label>Presence Penalty: <span x-text="inferenceParams.presence_penalty.toFixed(1)"></span></label>
+                        <input type="range" min="-2" max="2" step="0.1" x-model.number="inferenceParams.presence_penalty"
+                               @change="saveInferenceParams()" class="voice-slider">
+                    </div>
+                </div>
+
+                <!-- Voice Commands -->
+                <div class="voice-commands-section">
+                    <strong>🎯 Voice Commands</strong>
+                    <p class="voice-cmd-hint">Say these phrases while the mic is active to trigger actions without sending to Jarvis:</p>
+                    <div class="voice-cmd-list">
+                        <div class="voice-cmd-item" x-show="voiceCommandsEnabled">
+                            <code>"stop speaking"</code> — Stop TTS playback
+                        </div>
+                        <div class="voice-cmd-item" x-show="voiceCommandsEnabled">
+                            <code>"clear input"</code> — Clear the text field
+                        </div>
+                        <div class="voice-cmd-item" x-show="voiceCommandsEnabled">
+                            <code>"new conversation"</code> — Start a fresh chat
+                        </div>
+                        <div class="voice-cmd-item" x-show="voiceCommandsEnabled">
+                            <code>"send message"</code> — Submit current input
+                        </div>
+                    </div>
+                    <label class="voice-toggle-label">
+                        <input type="checkbox" x-model="voiceCommandsEnabled" @change="saveTtsPrefs()">
+                        Enable voice commands
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assistant Manager Modal -->
+    <div x-show="showAssistantManager" x-cloak style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000" @click.self="showAssistantManager=false">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;width:95%;max-width:700px;max-height:85vh;overflow-y:auto">
+            <h3 style="margin:0 0 1rem">🤖 Custom Assistants</h3>
+
+            <!-- Existing assistants -->
+            <div x-show="assistants.length > 0" style="margin-bottom:1.5rem">
+                <template x-for="a in assistants" :key="a.id">
+                    <div style="padding:0.6rem;background:var(--bg-input);border-radius:6px;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.75rem">
+                        <span style="font-size:1.3rem" x-text="a.icon"></span>
+                        <div style="flex:1">
+                            <strong x-text="a.name" style="font-size:0.9rem"></strong>
+                            <span x-show="a.shared" style="font-size:0.65rem;background:var(--accent);color:white;padding:0.1rem 0.3rem;border-radius:3px;margin-left:0.3rem">shared</span>
+                            <div style="font-size:0.75rem;color:var(--text-muted)" x-text="a.description || 'No description'"></div>
+                        </div>
+                        <button x-show="a.is_owner" class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:var(--error);color:white" @click="deleteAssistant(a.id)">🗑️</button>
+                    </div>
+                </template>
+            </div>
+            <div x-show="assistants.length === 0" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem">
+                No custom assistants yet. Create one below.
+            </div>
+
+            <!-- Create new assistant -->
+            <details open>
+                <summary style="cursor:pointer;font-weight:600;font-size:0.9rem;margin-bottom:0.75rem">➕ Create New Assistant</summary>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" x-model="newAssistant.name" class="form-input" placeholder="e.g. Code Reviewer, Creative Writer">
+                </div>
+                <div class="form-group">
+                    <label>Icon (emoji)</label>
+                    <input type="text" x-model="newAssistant.icon" class="form-input" style="max-width:60px" maxlength="2">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" x-model="newAssistant.description" class="form-input" placeholder="Short description of what this assistant does">
+                </div>
+                <div class="form-group">
+                    <label>System Prompt <button type="button" class="btn" style="font-size:0.65rem;padding:0.1rem 0.4rem;margin-left:0.5rem" @click="loadDefaultPrompt()">Load Jarvis Default</button></label>
+                    <textarea x-model="newAssistant.system_prompt" class="form-input" rows="8"
+                              style="font-family:monospace;font-size:0.8rem;resize:vertical"
+                              placeholder="Enter the system prompt that defines this assistant's personality and capabilities..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Inference Parameters</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.8rem">
+                        <div>
+                            <label style="font-size:0.75rem">Temperature: <span x-text="newAssistant.inference_params.temperature"></span></label>
+                            <input type="range" min="0" max="2" step="0.1" x-model.number="newAssistant.inference_params.temperature" style="width:100%">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem">Max Tokens: <span x-text="newAssistant.inference_params.max_tokens"></span></label>
+                            <input type="range" min="128" max="4096" step="128" x-model.number="newAssistant.inference_params.max_tokens" style="width:100%">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem">Top P: <span x-text="newAssistant.inference_params.top_p"></span></label>
+                            <input type="range" min="0" max="1" step="0.05" x-model.number="newAssistant.inference_params.top_p" style="width:100%">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem">Freq Penalty: <span x-text="newAssistant.inference_params.frequency_penalty"></span></label>
+                            <input type="range" min="-2" max="2" step="0.1" x-model.number="newAssistant.inference_params.frequency_penalty" style="width:100%">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="voice-toggle-label">
+                        <input type="checkbox" x-model="newAssistant.shared">
+                        Share with all users
+                    </label>
+                </div>
+                <button class="btn btn-primary" style="width:100%" @click="createNewAssistant()">Create Assistant</button>
+            </details>
+
+            <div style="margin-top:1rem;text-align:right">
+                <button class="btn" @click="showAssistantManager=false">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function chatApp() {
+    // Load persisted preferences
+    const prefs = JSON.parse(localStorage.getItem('jarvis_voice_prefs') || '{}');
+
+    return {
+        // Chat state
+        messages: [],
+        input: '',
+        loading: false,
+        sessionId: localStorage.getItem('jarvis_session_id') || '',
+        sessions: [],
+        sidebarOpen: window.innerWidth > 768,
+
+        // Search
+        searchQuery: '',
+        searchResults: [],
+
+        // Export
+        showExportMenu: false,
+
+        // Voice input state
+        isListening: false,
+        recognition: null,
+        sttLang: prefs.sttLang || 'en-GB',
+        lastSpeechTime: null,
+        commaPauseMs: prefs.commaPauseMs || 600,
+        periodPauseMs: prefs.periodPauseMs || 1500,
+        voiceCommandsEnabled: prefs.voiceCommandsEnabled !== false,
+        voiceCmdFeedback: '',
+
+        // Attachments
+        attachments: [],
+        showAttachMenu: false,
+
+        // Inference params (loaded from server)
+        inferenceParams: {temperature: 0.7, top_p: 0.9, max_tokens: 1024, frequency_penalty: 0.0, presence_penalty: 0.0},
+
+        // TTS state
+        ttsEnabled: prefs.ttsEnabled !== false,
+        showVoicePanel: false,
+        speechRate: prefs.speechRate || 0.92,
+        speechPitch: prefs.speechPitch || 0.85,
+        selectedVoiceName: prefs.selectedVoiceName || '',
+        selectedVoice: null,
+        availableVoices: [],
+        isSpeaking: false,
+
+        // Input history (UP/DOWN arrow navigation)
+        inputHistory: [],
+        historyIndex: -1,
+        historyDraft: '',
+
+        // Custom assistants
+        assistants: [],
+        selectedAssistantId: '',
+        showAssistantManager: false,
+        editingAssistant: null,
+        newAssistant: {name: '', description: '', system_prompt: '', icon: '🤖', shared: false, inference_params: {temperature: 0.7, top_p: 0.9, max_tokens: 2048, frequency_penalty: 0.3, presence_penalty: 0.1}},
+
+        // ── Init ──────────────────────────────────────────────────────────────
+        async init() {
+            await this.fetchSessions();
+            await this.fetchAssistants();
+            if (this.sessionId) await this.loadSessionMessages(this.sessionId);
+            this.pollNotifications();
+            this.loadVoices();
+            this.fetchInferenceParams();
+            // Request notification permission early
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            // Voices may load asynchronously
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
+            }
+        },
+
+        // ── Voice loading ─────────────────────────────────────────────────────
+        loadVoices() {
+            const all = window.speechSynthesis.getVoices();
+            if (!all.length) return;
+            this.availableVoices = all;
+
+            // Auto-select best British male voice if none saved
+            if (!this.selectedVoiceName) {
+                const preferred = all.find(v => v.name === 'Google UK English Male')
+                    || all.find(v => v.lang === 'en-GB' && v.name.toLowerCase().includes('male'))
+                    || all.find(v => v.name.includes('Daniel'))
+                    || all.find(v => v.lang === 'en-GB')
+                    || all.find(v => v.lang.startsWith('en'));
+                if (preferred) {
+                    this.selectedVoiceName = preferred.name;
+                    this.selectedVoice = preferred;
+                }
+            } else {
+                this.applyVoiceSelection();
+            }
+        },
+
+        applyVoiceSelection() {
+            this.selectedVoice = this.availableVoices.find(v => v.name === this.selectedVoiceName) || null;
+        },
+
+        saveTtsPrefs() {
+            localStorage.setItem('jarvis_voice_prefs', JSON.stringify({
+                ttsEnabled: this.ttsEnabled,
+                speechRate: this.speechRate,
+                speechPitch: this.speechPitch,
+                selectedVoiceName: this.selectedVoiceName,
+                sttLang: this.sttLang,
+                voiceCommandsEnabled: this.voiceCommandsEnabled,
+                commaPauseMs: this.commaPauseMs,
+                periodPauseMs: this.periodPauseMs,
+            }));
+        },
+
+        // ── Inference Parameters ──────────────────────────────────────────────
+        async fetchInferenceParams() {
+            try {
+                const resp = await fetch('/api/inference');
+                if (resp.ok) this.inferenceParams = await resp.json();
+            } catch (e) {}
+        },
+
+        async saveInferenceParams() {
+            try {
+                await fetch('/api/inference', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.inferenceParams)
+                });
+            } catch (e) {}
+        },
+
+        // ── Notifications polling ─────────────────────────────────────────────
+        async pollNotifications() {
+            setInterval(async () => {
+                try {
+                    const resp = await fetch('/api/notifications', {credentials: 'same-origin'});
+                    if (resp.ok) {
+                        const notifications = await resp.json();
+                        for (const n of notifications) {
+                            const now = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                            const msg = '🔔 ' + n.message;
+                            this.messages.push({
+                                id: Date.now() + Math.random(),
+                                role: 'assistant',
+                                content: msg,
+                                timestamp: now,
+                                isReminder: n.type === 'reminder',
+                                noteId: n.note_id || null,
+                            });
+                            this.scrollToBottom();
+                            if (this.ttsEnabled) this.speak(n.message);
+
+                            // Browser notification if tab is not focused
+                            if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+                                const title = n.type === 'reminder' ? '🔔 Jarvis Reminder' :
+                                              n.type === 'briefing' ? '☀️ Daily Briefing' :
+                                              n.type === 'workflow' ? '⚡ Workflow' :
+                                              n.type === 'suggestion' ? '💡 Suggestion' : '🔔 Jarvis';
+                                const body = n.message.substring(0, 200);
+                                try {
+                                    const notif = new Notification(title, {
+                                        body,
+                                        icon: '/static/favicon.ico',
+                                        tag: 'jarvis-' + (n.note_id || Date.now()),
+                                        requireInteraction: n.type === 'reminder'
+                                    });
+                                    // Click notification → focus this browser tab
+                                    notif.onclick = function(event) {
+                                        event.preventDefault();
+                                        window.focus();
+                                        window.parent.focus();
+                                        notif.close();
+                                    };
+                                } catch (e) {}
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }, 5000); // Poll every 5 seconds for more responsive notifications
+        },
+
+        // ── Reminder quick actions ───────────────────────────────────────────
+        async acknowledgeReminder(noteId, msgId) {
+            try {
+                // Send "done" via chat to trigger the acknowledgment flow
+                const resp = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({message: 'done', session_id: this.sessionId})
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const now = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                    // Remove the action buttons from the reminder message
+                    const msg = this.messages.find(m => m.id === msgId);
+                    if (msg) msg.isReminder = false;
+                    // Add the response
+                    this.messages.push({id: Date.now(), role: 'assistant', content: data.response, timestamp: now});
+                    this.scrollToBottom();
+                }
+            } catch (e) {}
+        },
+
+        async snoozeReminder(noteId, minutes, msgId) {
+            try {
+                const resp = await fetch(`/api/notes/${noteId}/snooze`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({minutes})
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const now = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                    // Remove action buttons
+                    const msg = this.messages.find(m => m.id === msgId);
+                    if (msg) msg.isReminder = false;
+                    this.messages.push({
+                        id: Date.now(),
+                        role: 'assistant',
+                        content: `⏰ Reminder snoozed for ${minutes} minute${minutes > 1 ? 's' : ''}. I'll remind you again at ${data.new_due}.`,
+                        timestamp: now
+                    });
+                    this.scrollToBottom();
+                }
+            } catch (e) {}
+        },
+
+        // ── Custom Assistants ─────────────────────────────────────────────────
+        async fetchAssistants() {
+            try {
+                const r = await fetch('/api/assistants', {credentials: 'same-origin'});
+                if (r.ok) this.assistants = await r.json();
+            } catch(e) {}
+        },
+
+        onAssistantChange() {
+            // Store preference
+            localStorage.setItem('jarvis_assistant_id', this.selectedAssistantId);
+        },
+
+        async createNewAssistant() {
+            if (!this.newAssistant.name.trim()) return;
+            // Load default prompt if empty
+            if (!this.newAssistant.system_prompt.trim()) {
+                try {
+                    const r = await fetch('/api/assistants/default-prompt');
+                    if (r.ok) {
+                        const data = await r.json();
+                        this.newAssistant.system_prompt = data.prompt;
+                    }
+                } catch(e) {}
+            }
+            try {
+                const r = await fetch('/api/assistants', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(this.newAssistant)
+                });
+                if (r.ok) {
+                    this.newAssistant = {name: '', description: '', system_prompt: '', icon: '🤖', shared: false, inference_params: {temperature: 0.7, top_p: 0.9, max_tokens: 1024, frequency_penalty: 0, presence_penalty: 0}};
+                    await this.fetchAssistants();
+                }
+            } catch(e) {}
+        },
+
+        async deleteAssistant(id) {
+            if (!confirm('Delete this assistant?')) return;
+            try {
+                await fetch(`/api/assistants/${id}`, {method: 'DELETE'});
+                if (this.selectedAssistantId == id) this.selectedAssistantId = '';
+                await this.fetchAssistants();
+            } catch(e) {}
+        },
+
+        async loadDefaultPrompt() {
+            try {
+                const r = await fetch('/api/assistants/default-prompt');
+                if (r.ok) {
+                    const data = await r.json();
+                    this.newAssistant.system_prompt = data.prompt;
+                }
+            } catch(e) {}
+        },
+
+        // ── Session management ────────────────────────────────────────────────
+        async fetchSessions() {
+            try {
+                const resp = await fetch('/api/sessions');
+                if (resp.ok) this.sessions = await resp.json();
+            } catch (e) {}
+        },
+
+        async loadSession(sid) {
+            this.sessionId = sid;
+            localStorage.setItem('jarvis_session_id', sid);
+            await this.loadSessionMessages(sid);
+            if (window.innerWidth <= 768) this.sidebarOpen = false;
+        },
+
+        async loadSessionMessages(sid) {
+            try {
+                const resp = await fetch('/api/sessions/' + sid);
+                if (resp.ok) {
+                    const history = await resp.json();
+                    this.messages = history.map((m, i) => ({
+                        id: i, role: m.role, content: m.content,
+                        timestamp: m.timestamp ? m.timestamp.substring(11, 19) : ''
+                    }));
+                    this.scrollToBottom();
+                }
+            } catch (e) {}
+        },
+
+        newChat() {
+            this.sessionId = '';
+            this.messages = [];
+            localStorage.removeItem('jarvis_session_id');
+        },
+
+        // ── Auto-resize textarea ─────────────────────────────────────────────
+        autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+        },
+
+        // ── Input history navigation (UP/DOWN arrows) ────────────────────────
+        navigateHistory(direction) {
+            if (this.inputHistory.length === 0) return;
+            if (direction === 'up') {
+                if (this.historyIndex === -1) {
+                    // Save current draft before navigating
+                    this.historyDraft = this.input;
+                    this.historyIndex = this.inputHistory.length - 1;
+                } else if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                }
+                this.input = this.inputHistory[this.historyIndex];
+            } else if (direction === 'down') {
+                if (this.historyIndex === -1) return;
+                if (this.historyIndex < this.inputHistory.length - 1) {
+                    this.historyIndex++;
+                    this.input = this.inputHistory[this.historyIndex];
+                } else {
+                    // Back to draft
+                    this.historyIndex = -1;
+                    this.input = this.historyDraft;
+                }
+            }
+            // Auto-resize after content change
+            this.$nextTick(() => {
+                const ta = this.$refs.chatInput;
+                if (ta) this.autoResize(ta);
+            });
+        },
+
+        // ── Send message ──────────────────────────────────────────────────────
+        async sendMessage() {
+            if (!this.input.trim() || this.loading) return;
+            const userMsg = this.input.trim();
+            // Save to input history for UP/DOWN navigation
+            this.inputHistory.push(userMsg);
+            this.historyIndex = -1;
+            this.historyDraft = '';
+            this.input = '';
+            // Reset textarea height after sending
+            this.$nextTick(() => {
+                const ta = this.$refs.chatInput;
+                if (ta) { ta.style.height = 'auto'; }
+            });
+            const now = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+            this.messages.push({ id: Date.now(), role: 'user', content: userMsg, timestamp: now });
+            this.loading = true;
+            this.scrollToBottom();
+
+            try {
+                let resp;
+                if (this.attachments.length > 0) {
+                    // Use context-aware endpoint
+                    const context = this.attachments.map(a => ({
+                        type: a.type,
+                        name: a.name,
+                        content: a.content
+                    }));
+                    resp = await fetch('/chat-with-context', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userMsg, session_id: this.sessionId, context })
+                    });
+                    // Clear attachments after sending
+                    this.attachments = [];
+                } else {
+                    resp = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userMsg, session_id: this.sessionId, assistant_id: this.selectedAssistantId || undefined })
+                    });
+                }
+                const data = await resp.json();
+                if (data.session_id) {
+                    this.sessionId = data.session_id;
+                    localStorage.setItem('jarvis_session_id', data.session_id);
+                }
+                const reply = data.response || data.error || 'No response received.';
+                const replyTime = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+                // Show agent thinking steps if present
+                if (data.agent_steps && data.agent_steps.length > 0) {
+                    this.messages.push({
+                        id: Date.now() + 0.5,
+                        role: 'thinking',
+                        content: this.formatAgentSteps(data.agent_steps),
+                        timestamp: ''
+                    });
+                }
+
+                this.messages.push({ id: Date.now() + 1, role: 'assistant', content: reply, timestamp: replyTime });
+                if (data.response) this.speak(data.response);
+                await this.fetchSessions();
+            } catch (err) {
+                this.messages.push({ id: Date.now() + 1, role: 'assistant', content: 'I apologize, Sir. A communication error has occurred.' });
+            }
+            this.loading = false;
+            this.scrollToBottom();
+            this.$nextTick(() => this.$refs.chatInput && this.$refs.chatInput.focus());
+        },
+
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const el = document.getElementById('chat-messages');
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        },
+
+        // ── Attachments ───────────────────────────────────────────────────────
+        triggerFileUpload() {
+            this.showAttachMenu = false;
+            this.$refs.fileInput.click();
+        },
+
+        async handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const resp = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.error) {
+                    alert('Upload error: ' + data.error);
+                } else {
+                    this.attachments.push({
+                        type: 'file',
+                        name: data.filename,
+                        content: data.content
+                    });
+                }
+            } catch (e) {
+                alert('Upload failed: ' + e.message);
+            }
+            // Reset file input
+            event.target.value = '';
+        },
+
+        async promptUrl() {
+            this.showAttachMenu = false;
+            const url = prompt('Enter a URL to fetch:');
+            if (!url || !url.trim()) return;
+
+            try {
+                const resp = await fetch('/api/fetch-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url.trim() })
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    alert('Fetch error: ' + data.error);
+                } else {
+                    this.attachments.push({
+                        type: 'url',
+                        name: url.trim().substring(0, 60),
+                        content: data.content
+                    });
+                }
+            } catch (e) {
+                alert('Fetch failed: ' + e.message);
+            }
+        },
+
+        // ── Voice Input (STT) ─────────────────────────────────────────────────
+        toggleVoiceInput() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Speech recognition requires Chrome or Edge.');
+                return;
+            }
+            if (this.isListening) {
+                this.recognition && this.recognition.stop();
+                this.isListening = false;
+                return;
+            }
+
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.recognition = new SR();
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.lang = this.sttLang;
+
+            let accumulated = '';
+            let lastFinalTime = null;
+
+            this.recognition.onresult = (event) => {
+                const now = Date.now();
+                let interim = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    const text = result[0].transcript;
+
+                    if (result.isFinal) {
+                        // Check for voice commands first
+                        if (this.voiceCommandsEnabled && this.handleVoiceCommand(text)) {
+                            lastFinalTime = now;
+                            continue;
+                        }
+
+                        // Pause-based punctuation
+                        const pause = lastFinalTime ? now - lastFinalTime : 0;
+                        if (accumulated && pause > this.periodPauseMs) {
+                            accumulated = accumulated.trimEnd().replace(/[,]$/, '') + '. ';
+                            const cap = text.trim();
+                            accumulated += cap.charAt(0).toUpperCase() + cap.slice(1);
+                        } else if (accumulated && pause > this.commaPauseMs) {
+                            accumulated = accumulated.trimEnd().replace(/[.]$/, '') + ', ' + text.trim();
+                        } else {
+                            accumulated += (accumulated ? ' ' : '') + text.trim();
+                        }
+                        lastFinalTime = now;
+                    } else {
+                        interim = text;
+                    }
+                }
+
+                // Show accumulated + live interim in input
+                this.input = accumulated + (interim ? ' ' + interim : '');
+            };
+
+            this.recognition.onerror = (e) => {
+                console.warn('STT error:', e.error);
+                this.isListening = false;
+            };
+
+            this.recognition.onend = () => {
+                // Auto-send if we have content and stopped naturally
+                if (accumulated.trim()) {
+                    this.input = accumulated.trim();
+                    this.sendMessage();
+                }
+                this.isListening = false;
+            };
+
+            this.recognition.start();
+            this.isListening = true;
+        },
+
+        // ── Voice Commands ────────────────────────────────────────────────────
+        handleVoiceCommand(text) {
+            const t = text.toLowerCase().trim();
+
+            if (t.includes('stop speaking') || t.includes('be quiet') || t.includes('silence')) {
+                window.speechSynthesis.cancel();
+                this.isSpeaking = false;
+                this.showVoiceFeedback('⏹ Stopped speaking');
+                return true;
+            }
+            if (t.includes('clear input') || t.includes('clear text') || t.includes('delete that')) {
+                this.input = '';
+                this.showVoiceFeedback('🗑 Input cleared');
+                return true;
+            }
+            if (t.includes('new conversation') || t.includes('start over') || t.includes('new chat')) {
+                this.newChat();
+                this.showVoiceFeedback('✨ New conversation started');
+                return true;
+            }
+            if (t.includes('send message') || t.includes('send that') || t.includes('submit')) {
+                if (this.input.trim()) {
+                    this.recognition && this.recognition.stop();
+                    this.sendMessage();
+                    this.showVoiceFeedback('📤 Sending message');
+                }
+                return true;
+            }
+            return false;
+        },
+
+        showVoiceFeedback(msg) {
+            this.voiceCmdFeedback = msg;
+            setTimeout(() => this.voiceCmdFeedback = '', 3000);
+        },
+
+        // ── TTS ───────────────────────────────────────────────────────────────
+        speak(text) {
+            if (!this.ttsEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+
+            // Strip markdown-style formatting for cleaner speech
+            const clean = text
+                .replace(/\*\*(.+?)\*\*/g, '$1')
+                .replace(/\*(.+?)\*/g, '$1')
+                .replace(/`(.+?)`/g, '$1')
+                .replace(/🔔|🎤|⚙️|🔊|🔇/g, '')
+                .trim();
+
+            const utterance = new SpeechSynthesisUtterance(clean);
+            utterance.rate = this.speechRate;
+            utterance.pitch = this.speechPitch;
+            utterance.volume = 1.0;
+            utterance.lang = this.sttLang;
+
+            // Apply selected voice (reload in case voices changed)
+            if (!this.selectedVoice) this.loadVoices();
+            if (this.selectedVoice) utterance.voice = this.selectedVoice;
+
+            utterance.onstart = () => { this.isSpeaking = true; };
+            utterance.onend = () => { this.isSpeaking = false; };
+            utterance.onerror = () => { this.isSpeaking = false; };
+
+            window.speechSynthesis.speak(utterance);
+        },
+
+        // ── Utilities ─────────────────────────────────────────────────────────
+        async searchConversations() {
+            if (!this.searchQuery.trim()) {
+                this.searchResults = [];
+                return;
+            }
+            try {
+                const resp = await fetch('/api/search?q=' + encodeURIComponent(this.searchQuery));
+                if (resp.ok) this.searchResults = await resp.json();
+            } catch (e) { this.searchResults = []; }
+        },
+
+        highlightSnippet(content, query) {
+            if (!content || !query) return '';
+            const idx = content.toLowerCase().indexOf(query.toLowerCase());
+            if (idx === -1) return content.substring(0, 80);
+            const start = Math.max(0, idx - 30);
+            const end = Math.min(content.length, idx + query.length + 30);
+            let snippet = (start > 0 ? '...' : '') + content.substring(start, end) + (end < content.length ? '...' : '');
+            return snippet;
+        },
+
+        formatAgentSteps(steps) {
+            return steps.map(s => {
+                const icon = s.type === 'thinking' ? '🧠' :
+                             s.type === 'tool_call' ? '🔧' :
+                             s.type === 'result' ? '📋' :
+                             s.type === 'final' ? '✅' : '•';
+                let line = `${icon} ${s.description}`;
+                if (s.details) line += '\n   → ' + s.details.join('\n   → ');
+                if (s.output) line += '\n   ' + s.output.substring(0, 150) + (s.output.length > 150 ? '...' : '');
+                return line;
+            }).join('\n');
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                const diff = Date.now() - d;
+                if (diff < 60000) return 'Just now';
+                if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+                if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+                return d.toLocaleDateString();
+            } catch (e) { return dateStr; }
+        }
+    }
+}
+</script>
+{% endblock %}

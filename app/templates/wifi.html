@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - WiFi Network{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="wifiApp()" x-init="fetchDevices()">
+    <h2>📶 WiFi Network Devices</h2>
+
+    <!-- Scan controls -->
+    <section class="dashboard-section">
+        <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:1rem">
+            <button class="btn btn-primary" @click="scanNetwork()" :disabled="scanning">
+                <span x-text="scanning ? '📡 Scanning...' : '📡 Scan Network'"></span>
+            </button>
+            <button class="btn" @click="fetchDevices()">🔄 Refresh</button>
+            <span class="text-muted" style="font-size:0.8rem" x-text="devices.length + ' device(s) known'"></span>
+            <span x-show="sessions.length > 0" style="font-size:0.8rem;color:var(--success)" x-text="sessions.length + ' active SSH session(s)'"></span>
+        </div>
+        <div x-show="msg" class="alert" :class="msgSuccess ? 'alert-success' : 'alert-error'" x-text="msg"></div>
+    </section>
+
+    <!-- Device list -->
+    <section class="dashboard-section">
+        <h3>Connected Devices</h3>
+        <div x-show="devices.length === 0" class="text-muted">No devices found. Click "Scan Network" to discover devices on your WiFi.</div>
+
+        <table class="data-table" x-show="devices.length > 0" style="font-size:0.85rem">
+            <thead>
+                <tr>
+                    <th>Name / Hostname</th>
+                    <th>IP Address</th>
+                    <th>MAC Address</th>
+                    <th>Last Seen</th>
+                    <th>SSH</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="d in devices" :key="d.mac">
+                    <tr>
+                        <td>
+                            <strong x-text="d.custom_name || d.hostname || 'unknown'"></strong>
+                            <span x-show="d.custom_name && d.hostname" style="font-size:0.7rem;color:var(--text-muted)" x-text="' (' + d.hostname + ')'"></span>
+                        </td>
+                        <td style="font-family:monospace" x-text="d.ip"></td>
+                        <td style="font-family:monospace;font-size:0.75rem" x-text="d.mac"></td>
+                        <td style="font-size:0.75rem" x-text="d.last_seen ? d.last_seen.substring(5) : ''"></td>
+                        <td>
+                            <span x-show="d.has_active_session" style="color:var(--success)">● Connected</span>
+                            <span x-show="!d.has_active_session && d.ssh_verified" style="color:var(--accent);font-size:0.75rem">✓ Verified</span>
+                        </td>
+                        <td style="display:flex;gap:0.3rem;flex-wrap:wrap">
+                            <button x-show="!d.has_active_session" class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem"
+                                    @click="connectSSH(d)">🔗 Connect</button>
+                            <button x-show="d.has_active_session" class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:var(--success);color:white"
+                                    @click="openConsole(d.ip)">💻 Console</button>
+                            <button x-show="d.has_active_session" class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:var(--error);color:white"
+                                    @click="disconnectSSH(d.ip)">✕</button>
+                            <button class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem" @click="editDevice(d)">✏️</button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- SSH Console -->
+    <section class="dashboard-section" x-show="consoleIp" x-cloak>
+        <h3>💻 SSH Console — <span x-text="consoleIp"></span></h3>
+        <div style="background:#0d1117;border:1px solid var(--border);border-radius:6px;padding:0.75rem;font-family:monospace;font-size:0.8rem;max-height:400px;overflow-y:auto;white-space:pre-wrap;color:#c9d1d9" x-ref="consoleOutput" x-text="consoleHistory"></div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+            <input type="text" x-model="consoleCmd" class="form-input" style="flex:1;font-family:monospace;font-size:0.85rem"
+                   placeholder="Enter command..." @keydown.enter="runConsoleCmd()">
+            <button class="btn btn-primary" @click="runConsoleCmd()" :disabled="consoleRunning">Run</button>
+            <button class="btn" @click="consoleIp=''; consoleHistory=''">Close</button>
+        </div>
+    </section>
+
+    <!-- SSH Credentials Modal -->
+    <div x-show="showCredModal" x-cloak style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000" @click.self="showCredModal=false">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;width:90%;max-width:400px">
+            <h3 style="margin:0 0 1rem">🔑 SSH Credentials</h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem" x-text="'Connecting to: ' + credTarget.ip"></p>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" x-model="credUsername" class="form-input" placeholder="e.g. pi, root, admin">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" x-model="credPassword" class="form-input" placeholder="Password">
+            </div>
+            <div class="form-group">
+                <label>Port</label>
+                <input type="number" x-model.number="credPort" class="form-input" value="22">
+            </div>
+            <div class="form-group">
+                <label class="voice-toggle-label">
+                    <input type="checkbox" x-model="credAutoTry">
+                    Try default credentials if these fail
+                </label>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1rem">
+                <button class="btn btn-primary" style="flex:1" @click="submitCredentials()">Connect</button>
+                <button class="btn" @click="showCredModal=false">Cancel</button>
+            </div>
+            <div x-show="credError" style="margin-top:0.75rem;font-size:0.8rem;color:var(--error)" x-text="credError"></div>
+        </div>
+    </div>
+
+    <!-- Edit Device Modal -->
+    <div x-show="showEditModal" x-cloak style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1000" @click.self="showEditModal=false">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;width:90%;max-width:400px">
+            <h3 style="margin:0 0 1rem">✏️ Edit Device</h3>
+            <div class="form-group">
+                <label>Custom Name</label>
+                <input type="text" x-model="editData.custom_name" class="form-input" placeholder="e.g. Living Room Pi">
+            </div>
+            <div class="form-group">
+                <label>SSH Username</label>
+                <input type="text" x-model="editData.ssh_username" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>SSH Password</label>
+                <input type="password" x-model="editData.ssh_password" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>SSH Port</label>
+                <input type="number" x-model.number="editData.ssh_port" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea x-model="editData.notes" class="form-input" rows="2"></textarea>
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1rem">
+                <button class="btn btn-primary" style="flex:1" @click="saveDevice()">Save</button>
+                <button class="btn" @click="showEditModal=false">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function wifiApp() {
+    return {
+        devices: [], sessions: [], scanning: false,
+        msg: '', msgSuccess: false,
+        // Console
+        consoleIp: '', consoleHistory: '', consoleCmd: '', consoleRunning: false,
+        // Credential modal
+        showCredModal: false, credTarget: {}, credUsername: '', credPassword: '', credPort: 22, credAutoTry: true, credError: '',
+        // Edit modal
+        showEditModal: false, editData: {}, editMac: '',
+
+        async fetchDevices() {
+            try {
+                const r = await fetch('/api/wifi/devices');
+                if (r.ok) this.devices = await r.json();
+                const s = await fetch('/api/wifi/sessions');
+                if (s.ok) this.sessions = await s.json();
+            } catch(e) {}
+        },
+
+        async scanNetwork() {
+            this.scanning = true; this.msg = '';
+            try {
+                const r = await fetch('/api/wifi/scan', {method: 'POST'});
+                if (r.ok) {
+                    const data = await r.json();
+                    this.devices = data.devices || [];
+                    this.msg = `Found ${this.devices.length} device(s).`;
+                    this.msgSuccess = true;
+                }
+            } catch(e) { this.msg = 'Scan failed.'; this.msgSuccess = false; }
+            this.scanning = false;
+            setTimeout(() => this.msg = '', 4000);
+        },
+
+        connectSSH(device) {
+            if (device.ssh_verified && device.ssh_username) {
+                // Try with stored credentials directly
+                this._doConnect(device.ip, device.ssh_username, null, device.ssh_port || 22, true);
+            } else {
+                // Show credential modal
+                this.credTarget = device;
+                this.credUsername = device.ssh_username || 'pi';
+                this.credPassword = '';
+                this.credPort = device.ssh_port || 22;
+                this.credAutoTry = true;
+                this.credError = '';
+                this.showCredModal = true;
+            }
+        },
+
+        async submitCredentials() {
+            this.credError = '';
+            const result = await this._doConnect(
+                this.credTarget.ip, this.credUsername, this.credPassword, this.credPort, this.credAutoTry
+            );
+            if (result && result.success) {
+                this.showCredModal = false;
+            } else if (result && result.needs_credentials) {
+                this.credError = result.error || 'Authentication failed. Try different credentials.';
+            } else if (result && result.error) {
+                this.credError = result.error;
+            }
+        },
+
+        async _doConnect(ip, username, password, port, autoTry) {
+            try {
+                const r = await fetch('/api/wifi/ssh/connect', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ip, username, password, port, auto_try: autoTry})
+                });
+                const data = await r.json();
+                if (data.success) {
+                    this.msg = data.message; this.msgSuccess = true;
+                    this.fetchDevices();
+                    setTimeout(() => this.msg = '', 4000);
+                }
+                return data;
+            } catch(e) { return {error: 'Network error'}; }
+        },
+
+        async disconnectSSH(ip) {
+            try {
+                await fetch('/api/wifi/ssh/disconnect', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ip})
+                });
+                this.fetchDevices();
+                if (this.consoleIp === ip) { this.consoleIp = ''; this.consoleHistory = ''; }
+            } catch(e) {}
+        },
+
+        openConsole(ip) {
+            this.consoleIp = ip;
+            this.consoleHistory = `Connected to ${ip}. Type commands below.\n$ `;
+            this.consoleCmd = '';
+        },
+
+        async runConsoleCmd() {
+            if (!this.consoleCmd.trim() || !this.consoleIp) return;
+            const cmd = this.consoleCmd.trim();
+            this.consoleCmd = '';
+            this.consoleHistory += cmd + '\n';
+            this.consoleRunning = true;
+            try {
+                const r = await fetch('/api/wifi/ssh/execute', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ip: this.consoleIp, command: cmd})
+                });
+                const data = await r.json();
+                if (data.stdout) this.consoleHistory += data.stdout;
+                if (data.stderr) this.consoleHistory += data.stderr;
+                if (data.error) this.consoleHistory += '⚠️ ' + data.error + '\n';
+                this.consoleHistory += '$ ';
+            } catch(e) {
+                this.consoleHistory += '⚠️ Network error\n$ ';
+            }
+            this.consoleRunning = false;
+            this.$nextTick(() => {
+                const el = this.$refs.consoleOutput;
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        },
+
+        editDevice(d) {
+            this.editMac = d.mac;
+            this.editData = {
+                custom_name: d.custom_name || '',
+                ssh_username: d.ssh_username || '',
+                ssh_password: '',
+                ssh_port: d.ssh_port || 22,
+                notes: d.notes || '',
+            };
+            this.showEditModal = true;
+        },
+
+        async saveDevice() {
+            try {
+                const body = {...this.editData};
+                if (!body.ssh_password) delete body.ssh_password; // Don't overwrite with empty
+                await fetch(`/api/wifi/devices/${this.editMac}`, {
+                    method: 'PUT', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+                this.showEditModal = false;
+                this.fetchDevices();
+            } catch(e) {}
+        }
+    }
+}
+</script>
+{% endblock %}

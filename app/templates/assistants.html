@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Custom Assistants{% endblock %}
+
+{% block content %}
+<div class="settings-container" x-data="assistantsPage()" x-init="fetchAssistants()">
+    <h2>🤖 Custom Assistants</h2>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.5rem">
+        Create and manage custom AI assistants with their own personality, system prompt, and inference parameters.
+        Select an assistant in the chat interface to use it.
+    </p>
+
+    <div x-show="msg" class="alert" :class="msgSuccess ? 'alert-success' : 'alert-error'" x-text="msg"></div>
+
+    <!-- Existing Assistants -->
+    <section class="settings-section" x-show="assistants.length > 0">
+        <h3>Your Assistants</h3>
+        <template x-for="a in assistants" :key="a.id">
+            <div style="padding:0.75rem;background:var(--bg-input);border-radius:6px;margin-bottom:0.75rem;border:1px solid var(--border)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                        <span style="font-size:1.5rem" x-text="a.icon"></span>
+                        <div>
+                            <strong x-text="a.name" style="font-size:0.95rem"></strong>
+                            <span x-show="a.shared" style="font-size:0.65rem;background:var(--accent);color:white;padding:0.1rem 0.3rem;border-radius:3px;margin-left:0.3rem">shared</span>
+                            <div style="font-size:0.75rem;color:var(--text-muted)" x-text="a.description || 'No description'"></div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:0.3rem">
+                        <button class="btn" style="font-size:0.75rem;padding:0.3rem 0.6rem" @click="editAssistant(a)">✏️ Edit</button>
+                        <button x-show="a.is_owner" class="btn" style="font-size:0.75rem;padding:0.3rem 0.6rem;background:var(--error);color:white" @click="deleteAssistant(a.id)">🗑️</button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:1rem;font-size:0.75rem;color:var(--text-muted);flex-wrap:wrap">
+                    <span>🌡️ Temp: <span x-text="a.inference_params.temperature"></span></span>
+                    <span>📝 Tokens: <span x-text="a.inference_params.max_tokens"></span></span>
+                    <span>🎯 Top P: <span x-text="a.inference_params.top_p"></span></span>
+                    <span>🔁 Freq: <span x-text="a.inference_params.frequency_penalty"></span></span>
+                    <span>Owner: <span x-text="a.username"></span></span>
+                </div>
+            </div>
+        </template>
+    </section>
+
+    <section class="settings-section" x-show="assistants.length === 0">
+        <p style="color:var(--text-muted)">No custom assistants yet. Create one below.</p>
+    </section>
+
+    <!-- Create / Edit Form -->
+    <section class="settings-section">
+        <h3 x-text="editing ? '✏️ Edit Assistant: ' + form.name : '➕ Create New Assistant'"></h3>
+
+        <div class="form-group">
+            <label>Name *</label>
+            <input type="text" x-model="form.name" class="form-input" placeholder="e.g. Code Reviewer, D&D Master, Creative Writer">
+        </div>
+
+        <div style="display:flex;gap:1rem">
+            <div class="form-group" style="flex:0 0 80px">
+                <label>Icon</label>
+                <input type="text" x-model="form.icon" class="form-input" style="text-align:center;font-size:1.3rem" maxlength="2">
+            </div>
+            <div class="form-group" style="flex:1">
+                <label>Description</label>
+                <input type="text" x-model="form.description" class="form-input" placeholder="Short description of what this assistant does">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>
+                System Prompt *
+                <button type="button" class="btn" style="font-size:0.65rem;padding:0.1rem 0.4rem;margin-left:0.5rem" @click="loadDefaultPrompt()">Load Jarvis Default</button>
+            </label>
+            <textarea x-model="form.system_prompt" class="form-input" rows="12"
+                      style="font-family:monospace;font-size:0.8rem;resize:vertical;line-height:1.4"
+                      placeholder="Enter the system prompt that defines this assistant's personality, capabilities, and behavior..."></textarea>
+            <small class="form-hint">Use <code>{current_datetime}</code> and <code>{user_honorific}</code> as placeholders — they'll be replaced at runtime.</small>
+        </div>
+
+        <!-- Inference Parameters -->
+        <div class="form-group">
+            <label>Inference Parameters</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.5rem">
+                <div>
+                    <label style="font-size:0.8rem">Temperature: <strong x-text="form.inference_params.temperature.toFixed(2)"></strong></label>
+                    <input type="range" min="0" max="2" step="0.05" x-model.number="form.inference_params.temperature" class="voice-slider">
+                    <small class="form-hint">Lower = focused. Higher = creative.</small>
+                </div>
+                <div>
+                    <label style="font-size:0.8rem">Max Tokens: <strong x-text="form.inference_params.max_tokens"></strong></label>
+                    <input type="range" min="128" max="4096" step="64" x-model.number="form.inference_params.max_tokens" class="voice-slider">
+                    <small class="form-hint">Maximum response length.</small>
+                </div>
+                <div>
+                    <label style="font-size:0.8rem">Top P: <strong x-text="form.inference_params.top_p.toFixed(2)"></strong></label>
+                    <input type="range" min="0" max="1" step="0.05" x-model.number="form.inference_params.top_p" class="voice-slider">
+                    <small class="form-hint">Nucleus sampling threshold.</small>
+                </div>
+                <div>
+                    <label style="font-size:0.8rem">Frequency Penalty: <strong x-text="form.inference_params.frequency_penalty.toFixed(2)"></strong></label>
+                    <input type="range" min="-2" max="2" step="0.1" x-model.number="form.inference_params.frequency_penalty" class="voice-slider">
+                    <small class="form-hint">Positive = less repetition.</small>
+                </div>
+                <div>
+                    <label style="font-size:0.8rem">Presence Penalty: <strong x-text="form.inference_params.presence_penalty.toFixed(2)"></strong></label>
+                    <input type="range" min="-2" max="2" step="0.1" x-model.number="form.inference_params.presence_penalty" class="voice-slider">
+                    <small class="form-hint">Positive = more topic diversity.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="voice-toggle-label">
+                <input type="checkbox" x-model="form.shared">
+                Share with all users
+            </label>
+            <small class="form-hint">When shared, all users can select this assistant in their chat.</small>
+        </div>
+
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary" style="flex:1" @click="saveAssistant()" x-text="editing ? 'Save Changes' : 'Create Assistant'"></button>
+            <button x-show="editing" class="btn" @click="resetForm()">Cancel</button>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function assistantsPage() {
+    const defaultParams = {temperature: 0.7, top_p: 0.9, max_tokens: 2048, frequency_penalty: 0.3, presence_penalty: 0.1};
+
+    return {
+        assistants: [],
+        editing: false,
+        editingId: null,
+        msg: '', msgSuccess: false,
+        form: {
+            name: '', description: '', icon: '🤖', shared: false,
+            system_prompt: '',
+            inference_params: {...defaultParams},
+        },
+
+        async fetchAssistants() {
+            try {
+                const r = await fetch('/api/assistants');
+                if (r.ok) this.assistants = await r.json();
+            } catch(e) {}
+        },
+
+        editAssistant(a) {
+            this.editing = true;
+            this.editingId = a.id;
+            this.form = {
+                name: a.name,
+                description: a.description || '',
+                icon: a.icon || '🤖',
+                shared: a.shared,
+                system_prompt: a.system_prompt,
+                inference_params: {...defaultParams, ...a.inference_params},
+            };
+            // Scroll to form
+            window.scrollTo({top: document.querySelector('.settings-section:last-of-type').offsetTop - 80, behavior: 'smooth'});
+        },
+
+        resetForm() {
+            this.editing = false;
+            this.editingId = null;
+            this.form = {
+                name: '', description: '', icon: '🤖', shared: false,
+                system_prompt: '',
+                inference_params: {...defaultParams},
+            };
+        },
+
+        async saveAssistant() {
+            this.msg = '';
+            if (!this.form.name.trim()) {
+                this.msg = 'Name is required.'; this.msgSuccess = false; return;
+            }
+            if (!this.form.system_prompt.trim()) {
+                this.msg = 'System prompt is required.'; this.msgSuccess = false; return;
+            }
+
+            try {
+                let r;
+                if (this.editing) {
+                    r = await fetch(`/api/assistants/${this.editingId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.form)
+                    });
+                } else {
+                    r = await fetch('/api/assistants', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.form)
+                    });
+                }
+                const data = await r.json();
+                if (r.ok) {
+                    this.msg = data.message || 'Saved!';
+                    this.msgSuccess = true;
+                    this.resetForm();
+                    await this.fetchAssistants();
+                } else {
+                    this.msg = data.error || 'Failed to save.';
+                    this.msgSuccess = false;
+                }
+                setTimeout(() => this.msg = '', 4000);
+            } catch(e) {
+                this.msg = 'Network error.'; this.msgSuccess = false;
+            }
+        },
+
+        async deleteAssistant(id) {
+            if (!confirm('Delete this assistant permanently?')) return;
+            try {
+                const r = await fetch(`/api/assistants/${id}`, {method: 'DELETE'});
+                if (r.ok) {
+                    this.msg = 'Assistant deleted.'; this.msgSuccess = true;
+                    await this.fetchAssistants();
+                    setTimeout(() => this.msg = '', 3000);
+                }
+            } catch(e) {}
+        },
+
+        async loadDefaultPrompt() {
+            try {
+                const r = await fetch('/api/assistants/default-prompt');
+                if (r.ok) {
+                    const data = await r.json();
+                    this.form.system_prompt = data.prompt;
+                }
+            } catch(e) {}
+        }
+    }
+}
+</script>
+{% endblock %}

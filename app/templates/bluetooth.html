@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Bluetooth{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="btApp()" x-init="fetchDevices()">
+    <h2>Bluetooth Devices</h2>
+
+    <!-- Scan controls -->
+    <section class="dashboard-section">
+        <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:1rem">
+            <button class="btn btn-primary" @click="scan()" :disabled="scanning">
+                <span x-text="scanning ? '📡 Scanning...' : '📡 Scan for Devices'"></span>
+            </button>
+            <button class="btn" @click="fetchDevices()">🔄 Refresh</button>
+            <span class="text-muted" style="font-size:0.8rem" x-text="devices.length + ' device(s) known'"></span>
+        </div>
+    </section>
+
+    <!-- Device list -->
+    <section class="dashboard-section">
+        <h3>Discovered Devices</h3>
+        <div x-show="devices.length === 0" class="text-muted">No devices found. Click "Scan" to discover nearby Bluetooth devices.</div>
+
+        <div style="display:grid;gap:0.75rem">
+            <template x-for="d in devices" :key="d.address">
+                <div class="metric-card" style="cursor:pointer" @click="selectDevice(d.address)"
+                     :style="selectedDevice === d.address ? 'border-color:var(--accent)' : ''">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <strong x-text="d.name"></strong>
+                            <span style="font-size:0.75rem;color:var(--text-muted)" x-text="' (' + d.address + ')'"></span>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;align-items:center">
+                            <button x-show="!d.connected" class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem"
+                                    @click.stop="connectDevice(d.address)">🔗 Connect</button>
+                            <button x-show="d.connected" class="btn" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:var(--error);color:white"
+                                    @click.stop="disconnectDevice(d.address)">✕ Disconnect</button>
+                            <span x-show="d.connected" style="color:var(--success);font-size:0.8rem">● Connected</span>
+                            <span x-show="!d.connected" style="color:var(--text-muted);font-size:0.8rem">○ Disconnected</span>
+                            <span x-show="d.has_sensor_data" style="font-size:0.8rem">📊</span>
+                        </div>
+                    </div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem">
+                        Type: <span x-text="d.device_type"></span>
+                        <span x-show="d.rssi"> | RSSI: <span x-text="d.rssi + ' dBm'"></span></span>
+                        | Last seen: <span x-text="d.last_seen"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <!-- Sensor data for selected device -->
+    <section class="dashboard-section" x-show="selectedDevice && sensorData.length > 0">
+        <h3>Live Sensor Data — <span x-text="selectedDevice"></span></h3>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+            <button class="btn" @click="refreshSensorData()" style="font-size:0.8rem">🔄 Refresh</button>
+            <button class="btn" @click="autoRefresh = !autoRefresh" :class="autoRefresh ? 'btn-primary' : ''" style="font-size:0.8rem">
+                <span x-text="autoRefresh ? '⏸ Stop Auto' : '▶ Auto-refresh'"></span>
+            </button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Accel X</th><th>Accel Y</th><th>Accel Z</th>
+                    <th>Gyro X</th><th>Gyro Y</th><th>Gyro Z</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="s in sensorData" :key="s.timestamp">
+                    <tr>
+                        <td x-text="s.timestamp.substring(11)"></td>
+                        <td x-text="s.accel.x.toFixed(3)"></td>
+                        <td x-text="s.accel.y.toFixed(3)"></td>
+                        <td x-text="s.accel.z.toFixed(3)"></td>
+                        <td x-text="s.gyro.x.toFixed(3)"></td>
+                        <td x-text="s.gyro.y.toFixed(3)"></td>
+                        <td x-text="s.gyro.z.toFixed(3)"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Fused context -->
+    <section class="dashboard-section">
+        <h3>Fused Context (IMU + GPS)</h3>
+        <button class="btn" @click="fetchContext()" style="font-size:0.8rem;margin-bottom:0.75rem">🔄 Refresh Context</button>
+        <pre style="background:var(--bg-input);padding:1rem;border-radius:6px;font-size:0.75rem;overflow-x:auto;color:var(--text-muted)" x-text="JSON.stringify(fusedContext, null, 2)"></pre>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function btApp() {
+    return {
+        devices: [],
+        scanning: false,
+        selectedDevice: '',
+        sensorData: [],
+        autoRefresh: false,
+        fusedContext: {},
+        refreshInterval: null,
+
+        async fetchDevices() {
+            try {
+                const r = await fetch('/api/bluetooth/devices');
+                if (r.ok) this.devices = await r.json();
+            } catch(e) {}
+        },
+
+        async scan() {
+            this.scanning = true;
+            try {
+                const r = await fetch('/api/bluetooth/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({duration: 5})
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    this.devices = data.devices || [];
+                }
+            } catch(e) {}
+            this.scanning = false;
+        },
+
+        selectDevice(addr) {
+            this.selectedDevice = addr;
+            this.refreshSensorData();
+            // Start auto-refresh if toggled
+            if (this.autoRefresh) this.startAutoRefresh();
+        },
+
+        async refreshSensorData() {
+            if (!this.selectedDevice) return;
+            try {
+                const r = await fetch(`/api/bluetooth/sensor-data/${this.selectedDevice}?last=20`);
+                if (r.ok) this.sensorData = await r.json();
+            } catch(e) {}
+        },
+
+        startAutoRefresh() {
+            if (this.refreshInterval) clearInterval(this.refreshInterval);
+            this.refreshInterval = setInterval(() => this.refreshSensorData(), 1000);
+        },
+
+        async fetchContext() {
+            try {
+                const r = await fetch('/api/bluetooth/context');
+                if (r.ok) this.fusedContext = await r.json();
+            } catch(e) {}
+        },
+
+        async connectDevice(address) {
+            try {
+                const r = await fetch(`/api/bluetooth/connect`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({address})
+                });
+                const data = await r.json();
+                if (data.success || data.message) this.fetchDevices();
+            } catch(e) {}
+        },
+
+        async disconnectDevice(address) {
+            try {
+                const r = await fetch(`/api/bluetooth/disconnect`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({address})
+                });
+                this.fetchDevices();
+            } catch(e) {}
+        },
+
+        init() {
+            this.$watch('autoRefresh', (val) => {
+                if (val) this.startAutoRefresh();
+                else if (this.refreshInterval) { clearInterval(this.refreshInterval); this.refreshInterval = null; }
+            });
+        }
+    }
+}
+</script>
+{% endblock %}

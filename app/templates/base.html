@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}J.A.R.V.I.S.{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.12/dist/htmx.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-logo">⚡</span>
+            <span class="nav-title">J.A.R.V.I.S.</span>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Chat</a>
+            {% if 'monitoring' in user_permissions or 'admin' in user_permissions %}
+            <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">Dashboard</a>
+            {% endif %}
+            {% if 'database' in user_permissions or 'admin' in user_permissions %}
+            <a href="/database" class="nav-link {% if request.path == '/database' %}active{% endif %}">Database</a>
+            {% endif %}
+            <a href="/knowledge" class="nav-link {% if request.path == '/knowledge' %}active{% endif %}">KB</a>
+            {% if 'bluetooth' in user_permissions or 'admin' in user_permissions %}
+            <a href="/bluetooth" class="nav-link {% if request.path == '/bluetooth' %}active{% endif %}">Bluetooth</a>
+            <a href="/wifi" class="nav-link {% if request.path == '/wifi' %}active{% endif %}">WiFi</a>
+            {% endif %}
+            {% if 'config' in user_permissions or 'admin' in user_permissions %}
+            <a href="/settings" class="nav-link {% if request.path == '/settings' %}active{% endif %}">Settings</a>
+            {% endif %}
+            <a href="/assistants" class="nav-link {% if request.path == '/assistants' %}active{% endif %}">Assistants</a>
+            <a href="/workflows" class="nav-link {% if request.path == '/workflows' %}active{% endif %}">Flows</a>
+            {% if 'admin' in user_permissions %}
+            <a href="/iam" class="nav-link {% if request.path == '/iam' %}active{% endif %}">IAM</a>
+            {% endif %}
+            <a href="/api/docs" class="nav-link" target="_blank">API</a>
+            <a href="/help" class="nav-link {% if request.path == '/help' %}active{% endif %}">Help</a>
+            <form action="/logout" method="POST" class="nav-logout">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Restart snackbar (polls for pending restart) -->
+    <div id="restart-snackbar" x-data="restartWatcher()" x-init="startPolling()"
+         x-show="pending" x-transition
+         style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#f85149;color:white;padding:0.75rem 1.5rem;border-radius:8px;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(248,81,73,0.4);display:flex;align-items:center;gap:0.75rem">
+        <span>⚠️ Server restarting in <strong x-text="remaining + 's'"></strong>...</span>
+    </div>
+    <script>
+    function restartWatcher() {
+        return {
+            pending: false,
+            remaining: 0,
+            startPolling() {
+                setInterval(async () => {
+                    try {
+                        const r = await fetch('/api/restart/status');
+                        if (r.ok) {
+                            const d = await r.json();
+                            this.pending = d.pending;
+                            this.remaining = d.remaining_seconds;
+                        }
+                    } catch(e) { this.pending = false; }
+                }, 2000);
+
+                // Also poll notifications for browser push
+                setInterval(async () => {
+                    const perms = JSON.parse(localStorage.getItem('jarvis_permissions') || '{}');
+                    if (!perms.notifications) return;
+                    try {
+                        const r = await fetch('/api/notifications');
+                        if (r.ok) {
+                            const notifs = await r.json();
+                            for (const n of notifs) {
+                                if (Notification.permission === 'granted' && document.hidden) {
+                                    new Notification('J.A.R.V.I.S.', {body: n.message, icon: '⚡'});
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }, 10000);
+            }
+        }
+    }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

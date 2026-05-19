@@ -1,0 +1,588 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Help & FAQ{% endblock %}
+
+{% block content %}
+<div class="help-container">
+    <h2>📖 Help & FAQ</h2>
+    <p class="help-intro">
+        J.A.R.V.I.S. (Just A Rather Very Intelligent System) is your personal AI assistant.
+        Below is a guide to everything it can do and how to interact with it effectively.
+    </p>
+
+    <!-- Quick Reference -->
+    <section class="help-section">
+        <h3>⌨️ Keyboard Shortcuts</h3>
+        <table class="help-table">
+            <tr><td><kbd>Enter</kbd></td><td>Send message</td></tr>
+            <tr><td><kbd>Shift</kbd> + <kbd>Enter</kbd></td><td>New line (multiline input)</td></tr>
+            <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Navigate through previously sent messages</td></tr>
+        </table>
+    </section>
+
+    <!-- Chat & Conversation -->
+    <section class="help-section">
+        <h3>💬 Chat & Conversation</h3>
+        <p>Just type naturally. Jarvis understands context and maintains conversation history.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">General chat</span>
+                <code>What's the capital of France?</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Follow-up</span>
+                <code>And what's its population?</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Time awareness</span>
+                <code>What time is it?</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Mental Notes & Reminders -->
+    <section class="help-section">
+        <h3>📝 Mental Notes & Reminders</h3>
+        <p>Jarvis can remember things for you and remind you at specific times. Notes can have due dates, commands to execute, and recurrence patterns.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Simple note</span>
+                <code>Remember that my meeting is at 3pm tomorrow</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Timed reminder</span>
+                <code>Remind me in 30 minutes to check the oven</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Recurring note</span>
+                <code>Create a recurring note every 2 hours to drink water</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Note with command</span>
+                <code>Schedule a note for 9am daily to run "python health_check.py"</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">View notes</span>
+                <code>What notes do you have?</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Clear all</span>
+                <code>Clear all notes</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Acknowledge</span>
+                <code>done</code>
+                <span class="example-note">— clears the last fired reminder</span>
+            </div>
+        </div>
+        <p class="help-tip">💡 Recurrence patterns: <code>hourly</code>, <code>daily</code>, <code>weekly</code>, <code>every 5m</code>, <code>every 2h</code></p>
+    </section>
+
+    <!-- Running Commands -->
+    <section class="help-section">
+        <h3>⚙️ System Commands</h3>
+        <p>Jarvis can execute shell commands on the host system. Dangerous commands are blocked by default.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Run a command</span>
+                <code>Run the command "dir"</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Natural language</span>
+                <code>Show me the disk usage</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Python script</span>
+                <code>Run python test.py</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Sandbox -->
+    <section class="help-section">
+        <h3>🐍 Code Sandbox</h3>
+        <p>Execute Python code directly in chat without creating files. Runs in a restricted environment with a 10-second timeout.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Direct code</span>
+                <code>print(2 ** 10)</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">With instruction</span>
+                <code>Run the following code: print("Hello World")</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Multiline (Shift+Enter)</span>
+                <code>import math<br>result = math.factorial(10)<br>print(f"10! = {result}")</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Calculations</span>
+                <code>Execute this: sum(range(1, 101))</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Available modules: <code>math</code>, <code>json</code>, <code>datetime</code>, <code>random</code>, <code>re</code>, <code>collections</code>, <code>itertools</code>, <code>functools</code></p>
+        <p class="help-tip">💡 You can also use the interactive sandbox in the <a href="/settings">Settings</a> page.</p>
+    </section>
+
+    <!-- Web Search -->
+    <section class="help-section">
+        <h3>🔍 Web Search</h3>
+        <p>Jarvis can search the web for current information.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Search</span>
+                <code>Search the web for "latest Python release"</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Natural</span>
+                <code>What's the latest news about AI?</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Weather -->
+    <section class="help-section">
+        <h3>🌡️ Weather</h3>
+        <p>Get current weather and forecasts for any city.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Current</span>
+                <code>What's the weather like?</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Specific city</span>
+                <code>Weather in London</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Forecast</span>
+                <code>Give me the 5-day forecast for Tokyo</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- File Management -->
+    <section class="help-section">
+        <h3>📁 File Management</h3>
+        <p>Read, write, search, and manage files in the project directory.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Read file</span>
+                <code>Show me the content of test.py</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">List files</span>
+                <code>List the files in the scripts folder</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Create file</span>
+                <code>Create a file called hello.py with a hello world script</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Edit + Run</span>
+                <code>Modify test.py to add error handling, then run it</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Automation -->
+    <section class="help-section">
+        <h3>⚡ Workflow Automation</h3>
+        <p>Define trigger→action rules that run automatically. Manage them in <a href="/settings">Settings</a> or via chat.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Create workflow</span>
+                <code>Create a workflow called "Morning Briefing" that triggers every weekday at 8am and delivers my daily briefing</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">List workflows</span>
+                <code>What workflows do I have?</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Trigger types: <code>schedule</code> (time-based), <code>gps_enter</code>/<code>gps_exit</code> (location zones), <code>event</code> (system events)</p>
+        <p class="help-tip">💡 Action types: <code>notify</code>, <code>run_command</code>, <code>briefing</code>, <code>smart_home</code>, <code>note</code>, <code>webhook</code></p>
+    </section>
+
+    <!-- Daily Briefing -->
+    <section class="help-section">
+        <h3>☀️ Daily Briefing</h3>
+        <p>A morning summary combining weather, calendar, notes, and metrics. Configure in <a href="/settings">Settings</a>.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">On demand</span>
+                <code>Give me my daily briefing</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Network & SSH -->
+    <section class="help-section">
+        <h3>🌐 Network & SSH</h3>
+        <p>Scan the local network and execute commands on remote machines.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Network scan</span>
+                <code>Scan the network for connected devices</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">SSH command</span>
+                <code>Run "uptime" on the server</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">List hosts</span>
+                <code>What SSH hosts are configured?</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Smart Home -->
+    <section class="help-section">
+        <h3>🏠 Smart Home</h3>
+        <p>Control Home Assistant devices (lights, switches). Requires HA_URL and HA_TOKEN in .env.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">List lights</span>
+                <code>What lights are on?</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Control</span>
+                <code>Turn on the living room light at 50% brightness</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Color</span>
+                <code>Set the bedroom light to blue</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Knowledge Base -->
+    <section class="help-section">
+        <h3>🧠 Knowledge Base</h3>
+        <p>Upload documents so Jarvis remembers information across conversations. Manage in the <a href="/knowledge">KB page</a>.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Upload via chat</span>
+                <code>Use the 📎 button to attach a document</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Query knowledge</span>
+                <code>What do you know about my project deadlines?</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Jarvis automatically retrieves relevant knowledge during conversations. Admins can see all users' documents.</p>
+    </section>
+
+    <!-- Voice -->
+    <section class="help-section">
+        <h3>🎤 Voice Input & Output</h3>
+        <p>Use the microphone button for speech-to-text. Toggle 🔊 for text-to-speech responses.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Voice commands</span>
+                <code>"Stop speaking"</code> — stops TTS<br>
+                <code>"Clear input"</code> — clears the text field<br>
+                <code>"New conversation"</code> — starts fresh<br>
+                <code>"Send message"</code> — sends current input
+            </div>
+        </div>
+    </section>
+
+    <!-- Context Attachments -->
+    <section class="help-section">
+        <h3>📎 Attachments</h3>
+        <p>Attach files or URLs as context for your message. Jarvis extracts text from PDFs, DOCX, images (OCR), Excel, and more.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">File upload</span>
+                <code>Click 📎 → Upload File → select any file</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">URL fetch</span>
+                <code>Click 📎 → Fetch URL → paste a webpage URL</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Then ask</span>
+                <code>Summarize this document</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Supported formats: PDF, DOCX, XLSX, PNG/JPG (OCR), TXT, CSV, JSON, XML, HTML, Python, and many more.</p>
+    </section>
+
+    <!-- API & Scripts -->
+    <section class="help-section">
+        <h3>🔌 API & Scripts</h3>
+        <p>Jarvis exposes a REST API for external integrations. Python scripts in <code>scripts/</code> become API endpoints automatically.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">API docs</span>
+                <code>Visit <a href="/api/docs" target="_blank">/api/docs</a> for the full Swagger UI</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Basic Auth</span>
+                <code>curl -u admin:password http://&lt;ip&gt;:5000/api/sessions</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">SSE notifications</span>
+                <code>const es = new EventSource('/api/subscribe')</code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tips -->
+    <section class="help-section">
+        <h3>💡 Contextual Suggestions</h3>
+        <p>Jarvis monitors your usage patterns and proactively suggests automations when it detects repetitive behavior.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">What it detects</span>
+                <code>Repetitive commands, time-based patterns, complex piped commands, frequent tool usage</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">OS history</span>
+                <code>Reads your shell history (bash/zsh/PowerShell) for deeper pattern analysis</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Suggestions</span>
+                <code>Delivered as notifications — accept to create a workflow/script, or dismiss</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Suggestions appear after Jarvis has observed a pattern at least 3 times. You can trigger OS history ingestion via the API: <code>POST /api/suggestions/ingest-history</code></p>
+    </section>
+
+    <!-- Custom Assistants -->
+    <section class="help-section">
+        <h3>🤖 Custom Assistants</h3>
+        <p>Create your own AI assistants with custom personalities, system prompts, and inference parameters. Each assistant can be selected in the chat interface.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Manage</span>
+                <code>Visit the <a href="/assistants">Assistants</a> page to create, edit, and delete assistants</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Switch in chat</span>
+                <code>Use the dropdown at the top of the chat to select an assistant</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: List</span>
+                <code>GET /api/assistants</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: Create</span>
+                <code>POST /api/assistants {"name": "Code Reviewer", "system_prompt": "...", "inference_params": {"max_tokens": 3000}}</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: Edit</span>
+                <code>PUT /api/assistants/{id} {"inference_params": {"max_tokens": 4096, "temperature": 0.5}}</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Default prompt</span>
+                <code>GET /api/assistants/default-prompt</code> — get the Jarvis system prompt as a starting template
+            </div>
+        </div>
+        <p class="help-tip">💡 Each assistant has its own: system prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty. Owners and admins can edit assistants. Shared assistants are visible to all users.</p>
+        <p class="help-tip">💡 For long-form content (stories, character sheets, reports), set <code>max_tokens</code> to 3000-4096 and <code>frequency_penalty</code> to 0.3-0.5 to avoid repetition.</p>
+    </section>
+
+    <!-- Cron Job Manager -->
+    <section class="help-section">
+        <h3>⏱️ Cron Job Manager</h3>
+        <p>Schedule recurring tasks with cron expressions or simple patterns. More powerful than notes-with-commands — supports full cron syntax, execution history, and output capture.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Simple patterns</span>
+                <code>every 5m</code>, <code>every 1h</code>, <code>daily 08:00</code>, <code>hourly</code>, <code>weekly mon 09:00</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Cron expressions</span>
+                <code>*/5 * * * *</code> (every 5 min), <code>0 8 * * 1-5</code> (weekdays at 8am), <code>0 0 * * 0</code> (Sunday midnight)
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: Create job</span>
+                <code>POST /api/cron {"name": "Health Check", "command": "python health.py", "schedule": "every 30m"}</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: List jobs</span>
+                <code>GET /api/cron</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: Run manually</span>
+                <code>POST /api/cron/{id}/run</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">API: View history</span>
+                <code>GET /api/cron/{id}/history</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Jobs are evaluated every minute by the scheduler. Each execution's output and exit code are recorded in history.</p>
+    </section>
+
+    <!-- Log Analyzer -->
+    <section class="help-section">
+        <h3>📋 Log Analyzer</h3>
+        <p>Monitor log files in real-time, detect error spikes, and receive alerts when things go wrong. Supports any text-based log file.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Add a watch</span>
+                <code>POST /api/logs/watches {"file_path": "/var/log/syslog", "label": "System", "error_threshold": 5, "window_minutes": 5}</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Tail a log</span>
+                <code>GET /api/logs/tail?file=/var/log/syslog&lines=100</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Search logs</span>
+                <code>GET /api/logs/search?file=/var/log/syslog&pattern=ERROR.*timeout</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Error summary</span>
+                <code>GET /api/logs/errors?file=/var/log/syslog</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">View alerts</span>
+                <code>GET /api/logs/alerts?unacknowledged=true</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 Detected patterns: ERROR, CRITICAL, FATAL, Traceback, HTTP 4xx/5xx, OOM, ConnectionRefused, PermissionDenied, disk full. Alerts fire when errors exceed the threshold within the monitoring window.</p>
+    </section>
+
+    <!-- Service Manager -->
+    <section class="help-section">
+        <h3>🐳 Service & Docker Manager</h3>
+        <p>Manage system services, Docker containers, and Git repositories — locally or on remote machines via SSH.</p>
+
+        <h4 style="font-size:0.9rem;margin:0.75rem 0 0.4rem;color:var(--accent)">System Services (systemd/Windows)</h4>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">List services</span>
+                <code>GET /api/services</code> or <code>GET /api/services?host=myserver</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Control service</span>
+                <code>POST /api/services/nginx/restart</code> — actions: start, stop, restart, enable, disable
+            </div>
+            <div class="help-example">
+                <span class="example-label">Service status</span>
+                <code>GET /api/services/nginx/status</code>
+            </div>
+        </div>
+
+        <h4 style="font-size:0.9rem;margin:0.75rem 0 0.4rem;color:var(--accent)">Docker</h4>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">List containers</span>
+                <code>GET /api/docker/containers?all=true</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Control container</span>
+                <code>POST /api/docker/containers/myapp/restart</code> — actions: start, stop, restart, pause, unpause
+            </div>
+            <div class="help-example">
+                <span class="example-label">Container logs</span>
+                <code>GET /api/docker/containers/myapp/logs?lines=100</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Resource stats</span>
+                <code>GET /api/docker/stats</code>
+            </div>
+        </div>
+
+        <h4 style="font-size:0.9rem;margin:0.75rem 0 0.4rem;color:var(--accent)">Git</h4>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Repo status</span>
+                <code>GET /api/git/status?repo=/path/to/repo</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Pull latest</span>
+                <code>POST /api/git/pull {"repo": ".", "host": "myserver"}</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Commit log</span>
+                <code>GET /api/git/log?repo=.&count=10</code>
+            </div>
+        </div>
+        <p class="help-tip">💡 All endpoints accept an optional <code>host</code> parameter to run on a remote machine via SSH. Service control actions (start/stop/restart) require admin permissions.</p>
+    </section>
+
+    <!-- Backup Orchestrator -->
+    <section class="help-section">
+        <h3>💾 Backup & Disaster Recovery</h3>
+        <p>Automated backups of the Jarvis database, configuration, scripts, and plugins. Supports local and remote (SCP) destinations with integrity verification.</p>
+        <div class="help-examples">
+            <div class="help-example">
+                <span class="example-label">Run backup now</span>
+                <code>POST /api/backups/run {"type": "full"}</code> — types: full, db, config
+            </div>
+            <div class="help-example">
+                <span class="example-label">View history</span>
+                <code>GET /api/backups</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Verify integrity</span>
+                <code>POST /api/backups/{id}/verify</code> — checks SHA256 checksum
+            </div>
+            <div class="help-example">
+                <span class="example-label">Configure</span>
+                <code>PUT /api/backups/config {"frequency": "daily", "time": "03:00", "remote_enabled": "true", "remote_host": "backup-server"}</code>
+            </div>
+            <div class="help-example">
+                <span class="example-label">Heartbeat</span>
+                <code>GET /api/backups/heartbeat</code> — public endpoint for external monitoring
+            </div>
+            <div class="help-example">
+                <span class="example-label">DR Plan</span>
+                <code>GET /api/backups/dr-plan</code> — generates step-by-step recovery instructions
+            </div>
+        </div>
+        <p class="help-tip">💡 Backups include: SQLite database, .env, requirements.txt, scripts/, plugins/. Configure <code>include_uploads: true</code> to also backup uploaded files.</p>
+        <p class="help-tip">💡 The heartbeat endpoint is public (no auth required) so external monitoring tools can check if Jarvis is alive. Status: healthy (&lt;2min), warning (&lt;10min), critical (&gt;10min since last beat).</p>
+
+        <h4 style="font-size:0.9rem;margin:0.75rem 0 0.4rem;color:var(--accent)">Disaster Recovery</h4>
+        <p style="font-size:0.85rem;color:var(--text-muted)">
+            The DR plan (<code>GET /api/backups/dr-plan</code>) provides:
+        </p>
+        <ul class="help-tips-list" style="margin-top:0.3rem">
+            <li>Current backup status and RPO (Recovery Point Objective)</li>
+            <li>Step-by-step recovery instructions for a new instance</li>
+            <li>Recommendations for improving backup resilience</li>
+            <li>Instance health status based on heartbeat</li>
+        </ul>
+    </section>
+
+    <!-- Pro Tips -->
+    <section class="help-section">
+        <h3>🎯 Pro Tips</h3>
+        <ul class="help-tips-list">
+            <li><strong>Multi-step reasoning:</strong> For complex tasks, Jarvis enters "agent mode" and chains multiple tools together automatically.</li>
+            <li><strong>Conversation export:</strong> Click the ⬇️ button next to a session in the sidebar to export as XLSX.</li>
+            <li><strong>Per-user isolation:</strong> Each user sees only their own conversations and notes. Admins see everything.</li>
+            <li><strong>LLM failover:</strong> If one API key hits rate limits, Jarvis automatically switches to the next provider.</li>
+            <li><strong>Auto-restart:</strong> Editing files in <code>app/</code> triggers an automatic server restart.</li>
+            <li><strong>Biometric login:</strong> Enroll your voice/face in Settings for hands-free authentication.</li>
+        </ul>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.help-container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+.help-intro { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+.help-section { margin-bottom: 2rem; padding: 1.25rem; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); }
+.help-section h3 { margin: 0 0 0.75rem 0; font-size: 1.1rem; }
+.help-section p { font-size: 0.9rem; color: var(--text-muted); margin: 0.5rem 0; }
+.help-section a { color: var(--accent); }
+.help-examples { margin: 0.75rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.help-example { padding: 0.5rem 0.75rem; background: var(--bg-input); border-radius: 6px; font-size: 0.85rem; }
+.help-example .example-label { display: inline-block; min-width: 120px; font-weight: 600; color: var(--accent); margin-right: 0.5rem; }
+.help-example code { background: var(--bg-primary); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.82rem; }
+.help-example .example-note { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem; }
+.help-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.help-table td { padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }
+.help-table td:first-child { width: 200px; }
+.help-table kbd { display: inline-block; padding: 0.15rem 0.5rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; font-family: monospace; font-size: 0.8rem; }
+.help-tip { font-size: 0.82rem !important; color: var(--text-muted) !important; margin-top: 0.5rem !important; }
+.help-tip code { background: var(--bg-input); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
+.help-tips-list { padding-left: 1.2rem; font-size: 0.85rem; color: var(--text-muted); }
+.help-tips-list li { margin-bottom: 0.5rem; }
+.help-tips-list strong { color: var(--text-primary); }
+</style>
+{% endblock %}

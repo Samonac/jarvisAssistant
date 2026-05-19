@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}J.A.R.V.I.S. - Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="dashboard" x-data="kbApp()" x-init="fetchDocs()">
+    <h2>📚 Knowledge Base</h2>
+
+    <!-- Add document -->
+    <section class="dashboard-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3>Documents</h3>
+            <button class="btn btn-primary" @click="showAdd = !showAdd">+ Add Document</button>
+        </div>
+
+        <div x-show="showAdd" style="padding:1rem;background:var(--bg-input);border-radius:8px;margin-bottom:1rem">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" class="form-input" x-model="newDoc.title" placeholder="Document title">
+            </div>
+
+            <!-- Upload or paste toggle -->
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+                <button class="btn" :class="inputMode === 'paste' ? 'btn-primary' : ''" @click="inputMode = 'paste'" style="font-size:0.8rem">📝 Paste Text</button>
+                <button class="btn" :class="inputMode === 'upload' ? 'btn-primary' : ''" @click="inputMode = 'upload'" style="font-size:0.8rem">📄 Upload File</button>
+            </div>
+
+            <!-- Paste mode -->
+            <div class="form-group" x-show="inputMode === 'paste'">
+                <label>Content</label>
+                <textarea class="form-input" x-model="newDoc.content" rows="6" placeholder="Paste document content here... It will be automatically chunked."></textarea>
+            </div>
+
+            <!-- Upload mode -->
+            <div class="form-group" x-show="inputMode === 'upload'">
+                <label>Upload a file (PDF, DOCX, TXT, MD, code files, etc.)</label>
+                <input type="file" x-ref="kbFileInput" @change="handleFileUpload($event)"
+                       style="margin-top:0.5rem;font-size:0.85rem">
+                <div x-show="uploadStatus" style="font-size:0.8rem;margin-top:0.3rem;color:var(--accent)" x-text="uploadStatus"></div>
+            </div>
+
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-primary" @click="addDocument()" :disabled="!newDoc.title || !newDoc.content">Save & Chunk</button>
+                <button class="btn" @click="showAdd = false">Cancel</button>
+            </div>
+        </div>
+
+        <div x-show="msg" class="alert" :class="msgOk ? 'alert-success' : 'alert-error'" x-text="msg"></div>
+
+        <!-- Document list -->
+        <div style="display:grid;gap:0.5rem">
+            <template x-for="doc in documents" :key="doc.id">
+                <div class="metric-card" style="cursor:pointer" @click="selectDoc(doc.id)"
+                     :style="selectedDoc === doc.id ? 'border-color:var(--accent)' : ''">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <strong x-text="doc.title"></strong>
+                        <div style="display:flex;gap:0.3rem;align-items:center">
+                            <span style="font-size:0.7rem;padding:0.15rem 0.4rem;background:var(--bg-input);border-radius:3px" x-text="doc.source"></span>
+                            <span style="font-size:0.7rem;color:var(--text-muted)" x-text="doc.username" x-show="doc.username"></span>
+                            <button class="btn" style="padding:0.15rem 0.4rem;font-size:0.7rem" @click.stop="deleteDoc(doc.id)">🗑️</button>
+                        </div>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-muted)" x-text="'Created: ' + doc.created_at"></div>
+                </div>
+            </template>
+        </div>
+        <p x-show="documents.length === 0" class="text-muted">No documents yet. Add one to start building your knowledge base.</p>
+    </section>
+
+    <!-- Chunks viewer -->
+    <section class="dashboard-section" x-show="selectedDoc && chunks.length > 0">
+        <h3>Chunks <span style="font-size:0.8rem;color:var(--text-muted)" x-text="'(' + chunks.length + ' chunks)'"></span></h3>
+        <div style="display:grid;gap:0.5rem">
+            <template x-for="chunk in chunks" :key="chunk.id">
+                <div style="padding:0.75rem;background:var(--bg-input);border-radius:6px;font-size:0.8rem">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                        <div style="flex:1">
+                            <span style="color:var(--text-muted);font-size:0.7rem" x-text="'#' + chunk.chunk_index"></span>
+                            <span x-show="editChunkId !== chunk.id" x-text="chunk.content" style="white-space:pre-wrap"></span>
+                            <textarea x-show="editChunkId === chunk.id" class="form-input" x-model="editChunkContent" rows="3" style="font-size:0.8rem"></textarea>
+                        </div>
+                        <div style="display:flex;gap:0.2rem;margin-left:0.5rem">
+                            <template x-if="editChunkId !== chunk.id">
+                                <span>
+                                    <button class="btn" style="padding:0.1rem 0.3rem;font-size:0.7rem" @click="editChunkId = chunk.id; editChunkContent = chunk.content">✏️</button>
+                                    <button class="btn" style="padding:0.1rem 0.3rem;font-size:0.7rem" @click="deleteChunk(chunk.id)">🗑️</button>
+                                </span>
+                            </template>
+                            <template x-if="editChunkId === chunk.id">
+                                <span>
+                                    <button class="btn btn-primary" style="padding:0.1rem 0.3rem;font-size:0.7rem" @click="saveChunk(chunk.id)">💾</button>
+                                    <button class="btn" style="padding:0.1rem 0.3rem;font-size:0.7rem" @click="editChunkId = null">✕</button>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+                    <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.3rem" x-text="'Keywords: ' + (chunk.keywords || '')"></div>
+                </div>
+            </template>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function kbApp() {
+    return {
+        documents: [],
+        chunks: [],
+        selectedDoc: null,
+        showAdd: false,
+        inputMode: 'upload',
+        uploadStatus: '',
+        newDoc: {title: '', content: ''},
+        msg: '', msgOk: false,
+        editChunkId: null,
+        editChunkContent: '',
+
+        async fetchDocs() {
+            try {
+                const r = await fetch('/api/kb/documents');
+                if (r.ok) this.documents = await r.json();
+            } catch(e) {}
+        },
+
+        async handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            this.uploadStatus = 'Extracting text from ' + file.name + '...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const r = await fetch('/api/upload', {method: 'POST', body: formData});
+                const data = await r.json();
+                if (data.error) {
+                    this.uploadStatus = 'Error: ' + data.error;
+                } else {
+                    this.newDoc.content = data.content;
+                    if (!this.newDoc.title) {
+                        this.newDoc.title = data.filename || file.name;
+                    }
+                    this.uploadStatus = `✓ Extracted ${data.content.length} characters from ${file.name}`;
+                }
+            } catch(e) {
+                this.uploadStatus = 'Upload failed: ' + e.message;
+            }
+        },
+
+        async addDocument() {
+            if (!this.newDoc.title || !this.newDoc.content) return;
+            const r = await fetch('/api/kb/documents', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(this.newDoc)
+            });
+            const d = await r.json();
+            if (d.document_id) {
+                this.msg = `Document added (${d.chunk_count} chunks)`; this.msgOk = true;
+                this.showAdd = false; this.newDoc = {title: '', content: ''};
+                await this.fetchDocs();
+            } else {
+                this.msg = d.error || 'Failed'; this.msgOk = false;
+            }
+            setTimeout(() => this.msg = '', 4000);
+        },
+
+        async selectDoc(id) {
+            this.selectedDoc = id;
+            try {
+                const r = await fetch(`/api/kb/documents/${id}/chunks`);
+                if (r.ok) this.chunks = await r.json();
+            } catch(e) {}
+        },
+
+        async deleteDoc(id) {
+            if (!confirm('Delete this document and all its chunks?')) return;
+            await fetch(`/api/kb/documents/${id}`, {method: 'DELETE'});
+            this.selectedDoc = null; this.chunks = [];
+            await this.fetchDocs();
+        },
+
+        async saveChunk(id) {
+            await fetch(`/api/kb/chunks/${id}`, {
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: this.editChunkContent})
+            });
+            this.editChunkId = null;
+            await this.selectDoc(this.selectedDoc);
+        },
+
+        async deleteChunk(id) {
+            if (!confirm('Delete this chunk?')) return;
+            await fetch(`/api/kb/chunks/${id}`, {method: 'DELETE'});
+            await this.selectDoc(this.selectedDoc);
+        }
+    }
+}
+</script>
+{% endblock %}

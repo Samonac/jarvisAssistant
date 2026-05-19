@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. - Sign Up</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+    <div class="login-container" style="max-width:420px">
+        <div class="login-header">
+            <span class="login-logo">⚡</span>
+            <h1>J.A.R.V.I.S.</h1>
+            <p class="login-subtitle">Create Your Account</p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="/signup" class="login-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autofocus placeholder="Choose a username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Choose a password (4+ chars)">
+            </div>
+            <div class="form-group">
+                <label for="honorific">How should Jarvis address you?</label>
+                <select id="honorific" name="honorific" style="width:100%;padding:0.6rem;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text)">
+                    <option value="Sir">Sir</option>
+                    <option value="Ma'am">Ma'am</option>
+                    <option value="Boss">Boss</option>
+                    <option value="Captain">Captain</option>
+                    <option value="Chief">Chief</option>
+                    <option value="Doctor">Doctor</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+        </form>
+
+        <p style="text-align:center;margin-top:1rem;font-size:0.85rem;color:var(--text-muted)">
+            Already have an account? <a href="/login" style="color:var(--accent)">Log in</a>
+        </p>
+
+        <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);text-align:center">
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem">
+                🎤 Voice enrollment can be completed after sign-up in Settings
+            </p>
+        </div>
+    </div>
+</body>
+</html>
