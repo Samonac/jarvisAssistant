@@ -80,9 +80,6 @@ WORKFLOW AUTOMATION:
 - list_workflows: List all active automation workflows. Args: {{}}
 - create_workflow: Create a new automation workflow. Args: {{"name": "<name>", "trigger_type": "<schedule|gps_enter|gps_exit|event>", "trigger_config": {{}}, "action_type": "<notify|run_command|briefing|smart_home|note|webhook>", "action_config": {{}}}}
 
-AUTOPILOT (nightly self-improvement mode):
-- autopilot_control: Start, pause, or stop the nightly autonomous coding mode, or check its status. Args: {{"action": "<start|pause|stop|status>"}}
-
 IMPORTANT RULES:
 1. When the user asks for the current time, ALWAYS use the get_time tool or refer to the SYSTEM CLOCK above. NEVER guess or invent a time.
 2. When the user mentions relative times like "in 5 minutes", "tomorrow", "next week", calculate from the SYSTEM CLOCK value above.
@@ -141,8 +138,6 @@ KNOWN_TOOLS = {
     "get_briefing",
     # Workflows
     "list_workflows", "create_workflow",
-    # Autopilot
-    "autopilot_control",
 }
 
 
@@ -194,7 +189,6 @@ class ConversationManager:
         self.workflow_engine = None  # Injected after construction
         self.code_sandbox = None  # Injected after construction
         self.suggestions_engine = None  # Injected after construction
-        self.autopilot_manager = None  # Injected after construction
 
     def handle_message(self, message: str, session_id: str) -> str:
         """Process a user message and return the assistant response.
@@ -212,10 +206,6 @@ class ConversationManager:
         import time
 
         start_time = time.time()
-
-        # Any chat activity resets the autopilot inactivity clock.
-        if self.autopilot_manager:
-            self.autopilot_manager.record_activity()
 
         # Check for pending email confirmation
         if session_id in self._pending_emails:
@@ -1513,8 +1503,6 @@ class ConversationManager:
                 return self._tool_list_workflows()
             elif tool_name == "create_workflow":
                 return self._tool_create_workflow(args)
-            elif tool_name == "autopilot_control":
-                return self._tool_autopilot_control(args)
             else:
                 # Check plugins
                 if self.plugin_manager and tool_name in self.plugin_manager.plugins:
@@ -2168,32 +2156,6 @@ class ConversationManager:
             return f"Failed to create workflow: {result['error']}"
         return f"Workflow '{name}' created successfully (ID: {result['id']}), Sir."
 
-    def _tool_autopilot_control(self, args: dict) -> str:
-        """Start, pause, stop, or report on the nightly autopilot mode."""
-        if not self.autopilot_manager:
-            return "The autopilot mode is not available, Sir."
-
-        action = str(args.get("action", "")).strip().lower()
-
-        if action == "start":
-            self.autopilot_manager.enable()
-            return (
-                "Autopilot mode is now enabled, Sir. It will only act during its "
-                "02:00-06:00 window, and only after an hour of no chat activity."
-            )
-        if action in ("pause", "stop"):
-            self.autopilot_manager.disable()
-            return f"Autopilot mode has been {'paused' if action == 'pause' else 'stopped'}, Sir."
-        if action == "status":
-            status = self.autopilot_manager.status_dict()
-            return (
-                f"Autopilot is currently {'enabled' if status['enabled'] else 'disabled'}, Sir. "
-                f"Window: {status['window']} (in window now: {status['in_window_now']}). "
-                f"Queued tasks: {status['queued_tasks']}. "
-                f"Awaiting your confirmation: {status['awaiting_confirmation']}."
-            )
-        return f"Unknown autopilot action: '{action}'. Use start, pause, stop, or status, Sir."
-
     def _handle_email_confirmation(self, message: str, session_id: str) -> str:
         """Handle user confirmation or cancellation of a pending email."""
         pending = self._pending_emails.get(session_id)
@@ -2253,28 +2215,19 @@ class ConversationManager:
             if len(history) > 4:  # More than 2 pairs = not the first exchange
                 return
 
-            # Generate title using LLM — use quick_chat to avoid thinking overhead
-            title_prompt = (
-                f"Generate a very short title (3-6 words max) for a conversation "
-                f"that starts with: {user_message[:200]!r}. "
-                f"Return ONLY the title, no quotes, no punctuation at the end."
-            )
-            from app.llm_client import GatewayClient
-            if isinstance(self.llm_client, GatewayClient):
-                title = self.llm_client.quick_chat(title_prompt)
-            else:
-                # Fallover clients — use the underlying gateway if available,
-                # otherwise fall back to the original approach
-                from app.llm_client import FailoverLLMClient
-                underlying = self.llm_client
-                if isinstance(underlying, FailoverLLMClient):
-                    label, first_client = underlying.clients[0]
-                    if isinstance(first_client, GatewayClient):
-                        title = first_client.quick_chat(title_prompt)
-                    else:
-                        title = self.llm_client.chat(title_messages)
-                else:
-                    title = self.llm_client.chat(title_messages)
+            # Generate title using LLM
+            title_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Generate a very short title (3-6 words max) for a conversation "
+                        "that starts with the following message. Return ONLY the title, "
+                        "nothing else. No quotes, no punctuation at the end."
+                    ),
+                },
+                {"role": "user", "content": user_message[:200]},
+            ]
+            title = self.llm_client.chat(title_messages)
 
             # Clean up the title
             title = title.strip().strip('"\'').strip()

@@ -1,0 +1,316 @@
+2026-07-31 17:49:10,538 [INFO] __main__: Database initialized at: jarvis.db
+2026-07-31 17:49:10,539 [INFO] app.llm_client: LLM Gateway configured at http://localhost:8000
+2026-07-31 17:49:10,540 [INFO] app.llm_client: LLM failover chain: gateway → huggingface → huggingface[key_2] → huggingface[key_3] → huggingface[key_4] → gemini
+2026-07-31 17:49:10,541 [INFO] __main__: Weather integration enabled (default city: Paris)
+2026-07-31 17:49:10,544 [INFO] __main__: File management enabled (base: /home/pi, project: /home/samonac/git/github/jarvisAssistant)
+2026-07-31 17:49:10,544 [INFO] __main__: SSH integration enabled (1 host(s))
+2026-07-31 17:49:10,547 [INFO] app.plugin_manager: Loaded 0 plugin(s) from plugins
+2026-07-31 17:49:10,552 [INFO] app.script_runner: Discovered 2 script(s) in /home/samonac/git/github/jarvisAssistant/scripts
+2026-07-31 17:49:11,427 [INFO] app.scheduler: Reminder scheduler started (interval: 10s)
+2026-07-31 17:49:11,427 [INFO] __main__: Reminder scheduler started
+2026-07-31 17:49:11,937 [INFO] app: Jarvis Assistant starting - Provider: huggingface, Capabilities: ['chat', 'command_execution', 'web_search', 'network_scan']
+2026-07-31 17:49:12,265 [INFO] app.file_watcher: File watcher started (dir: /home/samonac/git/github/jarvisAssistant/app, interval: 3s)
+2026-07-31 17:49:12,266 [INFO] __main__: Starting Jarvis Assistant on 0.0.0.0:5000 (single-threaded)
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-07-31 17:49:12,351 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.21:5000
+2026-07-31 17:49:12,352 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-07-31 17:49:17,947 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:17] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:17,959 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:17] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:49:17,973 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:17] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:49:19,820 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:19] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:49,744 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET / HTTP/1.1" 200 -
+2026-07-31 17:49:49,811 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-07-31 17:49:49,878 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/sessions HTTP/1.1" 200 -
+2026-07-31 17:49:49,898 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/sessions HTTP/1.1" 200 -
+2026-07-31 17:49:49,931 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/assistants HTTP/1.1" 200 -
+2026-07-31 17:49:49,949 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/assistants HTTP/1.1" 200 -
+2026-07-31 17:49:49,964 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/sessions/06069392-beb2-45e7-89f2-60761de20fce HTTP/1.1" 200 -
+2026-07-31 17:49:49,976 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/sessions/06069392-beb2-45e7-89f2-60761de20fce HTTP/1.1" 200 -
+2026-07-31 17:49:49,988 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:49] "GET /api/inference HTTP/1.1" 200 -
+2026-07-31 17:49:50,033 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:50] "GET /api/inference HTTP/1.1" 200 -
+2026-07-31 17:49:52,005 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:52] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:53,991 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:53] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:54,601 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:49:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:54,617 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:49:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:49:54,636 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:49:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:49:54,992 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:49:55,014 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:55] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:49:55,993 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:55] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:57,992 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:57] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:49:59,989 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:49:59] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:00,005 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:00] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:00,017 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:00] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:00,329 [INFO] app.llm_client: Gateway request — profile: fast [simple]
+2026-07-31 17:50:00,350 [ERROR] app.llm_client: Cannot reach gateway at http://localhost:8000
+2026-07-31 17:50:00,351 [WARNING] app.llm_client: Client 'gateway' failed (It appears we've lost network connectivity, Sir. Please veri…), trying next
+2026-07-31 17:50:00,352 [ERROR] app.llm_client: Assuming all LLM clients will fail
+2026-07-31 17:50:00,352 [INFO] app.llm_client: Gateway request — profile: fast [simple]
+2026-07-31 17:50:00,364 [ERROR] app.llm_client: Cannot reach gateway at http://localhost:8000
+2026-07-31 17:50:00,365 [WARNING] app.llm_client: Client 'gateway' failed (It appears we've lost network connectivity, Sir. Please veri…), trying next
+2026-07-31 17:50:00,365 [ERROR] app.llm_client: Assuming all LLM clients will fail
+2026-07-31 17:50:00,459 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:00] "POST /chat HTTP/1.1" 200 -
+2026-07-31 17:50:00,501 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:00] "GET /api/sessions HTTP/1.1" 200 -
+2026-07-31 17:50:02,004 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:02] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:04,006 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:04] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:04,992 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:04] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:05,016 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:05] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:06,004 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:06] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:08,008 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:08] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:09,992 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:09] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:10,027 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:10] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:10,047 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:10] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:12,016 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:12] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:14,018 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:14] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:14,992 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:14] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:15,083 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:15] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:16,025 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:16] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:18,030 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:18] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:20,001 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:20] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:20,021 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:20] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:20,033 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:20] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:22,038 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:22] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:24,037 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:24] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:25,017 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:25] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:25,030 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:25] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:26,046 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:26] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:28,077 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:28] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:30,003 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:30] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:30,024 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:30] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:30,061 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:30] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:32,064 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:32] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:34,072 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:34] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:35,006 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:35] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:35,031 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:35] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:36,067 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:36] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:38,072 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:38] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:40,010 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:40] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:40,035 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:40] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:40,070 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:40] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:42,079 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:42] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:44,082 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:44] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:45,017 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:45] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:45,036 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:45] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:46,093 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:46] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:48,087 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:48] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:50,014 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:50] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:50,042 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:50] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:50,090 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:50] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:52,094 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:52] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:54,102 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:54,474 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:50:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:54,491 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:50:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:54,510 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:50:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:55,028 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:55] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:55,048 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:55] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:50:56,767 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:56] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:50:59,919 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:50:59] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:00,768 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:00] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:00,783 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:00] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:02,772 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:02] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:06,069 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:06] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:06,772 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:06] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:06,782 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:06] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:08,777 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:08] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:11,903 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:11] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:12,768 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:12] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:12,779 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:12] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:14,769 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:14] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:17,771 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:17] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:18,770 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:18] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:18,787 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:18] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:20,765 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:20] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:23,789 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:23] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:24,769 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:24] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:24,780 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:24] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:26,773 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:26] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:29,625 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:29] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:29,769 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:29] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:29,780 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:29] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:31,633 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:31] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:33,633 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:33] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:34,777 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:34] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:34,789 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:34] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:35,640 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:35] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:37,644 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:37] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:39,677 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:39] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:39,780 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:39] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:39,795 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:39] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:41,651 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:41] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:43,655 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:43] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:44,783 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:44] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:44,794 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:44] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:45,658 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:45] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:47,665 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:47] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:49,667 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:49] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:49,788 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:49] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:49,798 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:49] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:51,675 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:51] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:53,695 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:53] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:54,515 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:51:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:54,531 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:51:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:54,559 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:51:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:54,793 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:54,806 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:55,681 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:55] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:57,678 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:57] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:59,687 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:59] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:51:59,794 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:59] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:51:59,809 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:51:59] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:01,689 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:01] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:03,698 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:03] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:04,802 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:04] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:04,816 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:04] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:05,695 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:05] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:07,705 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:07] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:09,707 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:09] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:09,804 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:09] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:09,819 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:09] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:11,711 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:11] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:13,715 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:13] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:14,807 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:14] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:14,819 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:14] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:15,718 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:15] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:17,725 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:17] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:19,731 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:19] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:19,812 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:19] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:19,824 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:19] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:21,734 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:21] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:23,737 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:23] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:24,816 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:24] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:24,830 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:24] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:25,737 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:25] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:27,739 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:27] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:29,745 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:29] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:29,825 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:29] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:29,836 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:29] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:31,750 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:31] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:33,753 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:33] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:34,825 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:34] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:34,843 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:34] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:35,763 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:35] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:37,761 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:37] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:39,764 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:39] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:39,827 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:39] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:39,841 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:39] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:41,770 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:41] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:43,772 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:43] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:44,829 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:44] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:44,840 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:44] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:45,778 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:45] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:47,782 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:47] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:49,788 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:49] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:49,830 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:49] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:49,841 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:49] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:51,792 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:51] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:53,795 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:53] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:54,578 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:52:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:54,594 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:52:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:54,623 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:52:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:54,838 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:54,853 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:55,797 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:55] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:57,802 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:57] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:59,807 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:59] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:52:59,836 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:59] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:52:59,848 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:52:59] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:53:01,809 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:01] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:03,824 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:03] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:04,850 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:04] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:53:04,863 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:04] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:53:05,816 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:05] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:07,822 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:07] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:08,127 [INFO] app.file_watcher: File change detected: /home/samonac/git/github/jarvisAssistant/app/config.py — restarting server...
+2026-07-31 17:53:08,128 [INFO] app.file_watcher: Restarting Jarvis Assistant in 5 seconds...
+2026-07-31 17:53:09,826 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:09] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:09,848 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:09] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:53:09,863 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:09] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:53:11,828 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:53:11] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:15,286 [INFO] __main__: Database initialized at: jarvis.db
+2026-07-31 17:53:15,287 [INFO] app.llm_client: LLM Gateway configured at http://llm-server.local:8000
+2026-07-31 17:53:15,288 [INFO] app.llm_client: LLM failover chain: gateway → huggingface → huggingface[key_2] → huggingface[key_3] → huggingface[key_4] → gemini
+2026-07-31 17:53:15,289 [INFO] __main__: Weather integration enabled (default city: Paris)
+2026-07-31 17:53:15,291 [INFO] __main__: File management enabled (base: /home/pi, project: /home/samonac/git/github/jarvisAssistant)
+2026-07-31 17:53:15,292 [INFO] __main__: SSH integration enabled (1 host(s))
+2026-07-31 17:53:15,294 [INFO] app.plugin_manager: Loaded 0 plugin(s) from plugins
+2026-07-31 17:53:15,300 [INFO] app.script_runner: Discovered 2 script(s) in /home/samonac/git/github/jarvisAssistant/scripts
+2026-07-31 17:53:16,161 [INFO] app.scheduler: Reminder scheduler started (interval: 10s)
+2026-07-31 17:53:16,162 [INFO] __main__: Reminder scheduler started
+2026-07-31 17:53:16,670 [INFO] app: Jarvis Assistant starting - Provider: huggingface, Capabilities: ['chat', 'command_execution', 'web_search', 'network_scan']
+2026-07-31 17:53:16,927 [INFO] app.file_watcher: File watcher started (dir: /home/samonac/git/github/jarvisAssistant/app, interval: 3s)
+2026-07-31 17:53:16,928 [INFO] __main__: Starting Jarvis Assistant on 0.0.0.0:5000 (single-threaded)
+ * Serving Flask app 'app'
+ * Debug mode: off
+Address already in use
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.
+2026-07-31 17:53:44,609 [INFO] __main__: Database initialized at: jarvis.db
+2026-07-31 17:53:44,611 [INFO] app.llm_client: LLM Gateway configured at http://llm-server.local:8000
+2026-07-31 17:53:44,611 [INFO] app.llm_client: LLM failover chain: gateway → huggingface → huggingface[key_2] → huggingface[key_3] → huggingface[key_4] → gemini
+2026-07-31 17:53:44,612 [INFO] __main__: Weather integration enabled (default city: Paris)
+2026-07-31 17:53:44,614 [INFO] __main__: File management enabled (base: /home/pi, project: /home/samonac/git/github/jarvisAssistant)
+2026-07-31 17:53:44,614 [INFO] __main__: SSH integration enabled (1 host(s))
+2026-07-31 17:53:44,617 [INFO] app.plugin_manager: Loaded 0 plugin(s) from plugins
+2026-07-31 17:53:44,621 [INFO] app.script_runner: Discovered 2 script(s) in /home/samonac/git/github/jarvisAssistant/scripts
+2026-07-31 17:53:45,489 [INFO] app.scheduler: Reminder scheduler started (interval: 10s)
+2026-07-31 17:53:45,489 [INFO] __main__: Reminder scheduler started
+2026-07-31 17:53:45,999 [INFO] app: Jarvis Assistant starting - Provider: huggingface, Capabilities: ['chat', 'command_execution', 'web_search', 'network_scan']
+2026-07-31 17:53:46,253 [INFO] app.file_watcher: File watcher started (dir: /home/samonac/git/github/jarvisAssistant/app, interval: 3s)
+2026-07-31 17:53:46,253 [INFO] __main__: Starting Jarvis Assistant on 0.0.0.0:5000 (single-threaded)
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-07-31 17:53:46,322 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.21:5000
+2026-07-31 17:53:46,323 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-07-31 17:53:54,488 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:53:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:53:54,504 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:53:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:53:54,519 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:53:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:02,168 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET / HTTP/1.1" 200 -
+2026-07-31 17:55:02,184 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:55:02] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:02,201 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:55:02] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:02,251 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+2026-07-31 17:55:02,305 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/sessions HTTP/1.1" 200 -
+2026-07-31 17:55:02,318 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/sessions HTTP/1.1" 200 -
+2026-07-31 17:55:02,331 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:55:02] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:02,356 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/assistants HTTP/1.1" 200 -
+2026-07-31 17:55:02,379 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/assistants HTTP/1.1" 200 -
+2026-07-31 17:55:02,396 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/sessions/06069392-beb2-45e7-89f2-60761de20fce HTTP/1.1" 200 -
+2026-07-31 17:55:02,408 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/sessions/06069392-beb2-45e7-89f2-60761de20fce HTTP/1.1" 200 -
+2026-07-31 17:55:02,437 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/inference HTTP/1.1" 200 -
+2026-07-31 17:55:02,452 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:02] "GET /api/inference HTTP/1.1" 200 -
+2026-07-31 17:55:04,348 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:04] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:06,406 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:06] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:07,444 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:07] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:07,468 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:07] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:08,409 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:08] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:10,470 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:10] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:12,446 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:12] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:12,466 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:12] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:12,476 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:12] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:14,574 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:14] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:17,512 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:17] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:17,523 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:17] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:21,474 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:21] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:22,608 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:22] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:22,624 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:22] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:27,707 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:27] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:27,719 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:27] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:31,887 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:31] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:32,808 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:32] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:32,820 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:32] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:49,005 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:49] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:49,021 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:49] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:49,031 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:49] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:54,533 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:55:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:54,549 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:55:54] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:54,584 [INFO] werkzeug: 192.168.1.13 - - [31/Jul/2026 17:55:54] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:58,628 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:58] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:55:58,643 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:58] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:55:58,659 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:55:58] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:56:32,796 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:56:32] "GET /api/restart/status HTTP/1.1" 200 -
+2026-07-31 17:56:32,807 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:56:32] "GET /api/notifications HTTP/1.1" 200 -
+2026-07-31 17:56:32,823 [INFO] werkzeug: 192.168.1.53 - - [31/Jul/2026 17:56:32] "GET /api/notifications HTTP/1.1" 200 -
