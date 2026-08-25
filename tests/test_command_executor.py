@@ -180,7 +180,9 @@ class TestTimeoutBehavior:
         """The configured timeout is passed to subprocess.run."""
         executor = CommandExecutor(blocklist=[], timeout=42)
 
-        with patch("app.command_executor.subprocess.run") as mock_run:
+        # Force the Linux/bash code path regardless of the host OS running the tests.
+        with patch("app.command_executor.IS_WINDOWS", False), \
+             patch("app.command_executor.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
             executor.execute("echo test")
 
@@ -191,6 +193,7 @@ class TestTimeoutBehavior:
             capture_output=True,
             text=True,
             timeout=42,
+            cwd=None,
         )
 
     def test_short_timeout_triggers_on_slow_command(self):
@@ -268,7 +271,9 @@ class TestCommandOutputCapture:
         """Commands are executed using /bin/bash via subprocess.run."""
         executor = CommandExecutor(blocklist=[], timeout=60)
 
-        with patch("app.command_executor.subprocess.run") as mock_run:
+        # Force the Linux/bash code path regardless of the host OS running the tests.
+        with patch("app.command_executor.IS_WINDOWS", False), \
+             patch("app.command_executor.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 stdout="/bin/bash\n", stderr="", returncode=0
             )
@@ -281,6 +286,7 @@ class TestCommandOutputCapture:
             capture_output=True,
             text=True,
             timeout=60,
+            cwd=None,
         )
 
     def test_empty_command_output(self):

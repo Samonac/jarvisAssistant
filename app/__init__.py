@@ -44,6 +44,16 @@ def create_app(config: Config | None = None) -> Flask:
 
     register_routes(app)
 
+    # Register the independent coding-agent mode routes (/api/agent/*)
+    from app.coding_agent.routes import register_coding_agent_routes
+
+    register_coding_agent_routes(app)
+
+    # Register the autopilot (nightly self-improvement) control-plane routes (/api/autopilot/*)
+    from app.autopilot.routes import register_autopilot_routes
+
+    register_autopilot_routes(app)
+
     # Log startup information
     _log_startup(config)
 

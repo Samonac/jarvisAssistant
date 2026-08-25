@@ -10,6 +10,7 @@ All errors are caught and returned as fallback messages — no unhandled excepti
 import logging
 import socket
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import requests
 
@@ -85,11 +86,13 @@ class LLMClient(ABC):
     """
 
     @abstractmethod
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], params: Optional["InferenceParams"] = None) -> str:
         """Send messages and return generated text.
 
         Args:
             messages: List of message dicts with 'role' and 'content' keys.
+            params: Optional per-call inference parameters. Defaults to the
+                shared module-level `inference_params` when omitted.
 
         Returns:
             Generated text response string. On error, returns a fallback message.
@@ -107,25 +110,27 @@ class GroqClient(LLMClient):
     API_URL = "https://api.groq.com/openai/v1/chat/completions"
     MODEL = "llama-3.3-70b-versatile"
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model: Optional[str] = None):
         self.api_key = api_key
+        self.model = model or self.MODEL
 
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], params: Optional[InferenceParams] = None) -> str:
         """Send messages to Groq API with streaming and return generated text."""
+        params = params or inference_params
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
             payload = {
-                "model": self.MODEL,
+                "model": self.model,
                 "messages": messages,
                 "stream": True,
-                "temperature": inference_params.temperature,
-                "top_p": inference_params.top_p,
-                "max_tokens": inference_params.max_tokens,
-                "frequency_penalty": inference_params.frequency_penalty,
-                "presence_penalty": inference_params.presence_penalty,
+                "temperature": params.temperature,
+                "top_p": params.top_p,
+                "max_tokens": params.max_tokens,
+                "frequency_penalty": params.frequency_penalty,
+                "presence_penalty": params.presence_penalty,
             }
 
             response = requests.post(
@@ -191,30 +196,35 @@ class HuggingFaceClient(LLMClient):
     """LLM client using HuggingFace Inference API.
 
     Uses the HuggingFace Router API (OpenAI-compatible) for chat completions.
-    Model: Qwen/Qwen2.5-7B-Instruct (free tier via serverless inference).
+    Model: meta-llama/Llama-3.2-3B-Instruct (free tier via serverless inference).
+    Note: this model is gated — the HF account behind each API key must accept
+    Meta's license at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct
+    before it can be used, or requests will fail with a 403.
     """
 
     API_URL = "https://router.huggingface.co/v1/chat/completions"
-    MODEL = "Qwen/Qwen2.5-7B-Instruct"
+    MODEL = "meta-llama/Llama-3.2-3B-Instruct"
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model: Optional[str] = None):
         self.api_key = api_key
+        self.model = model or self.MODEL
 
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], params: Optional[InferenceParams] = None) -> str:
         """Send messages to HuggingFace Router API and return generated text."""
+        params = params or inference_params
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
             payload = {
-                "model": self.MODEL,
+                "model": self.model,
                 "messages": messages,
-                "max_tokens": inference_params.max_tokens,
-                "temperature": inference_params.temperature,
-                "top_p": inference_params.top_p,
-                "frequency_penalty": inference_params.frequency_penalty,
-                "presence_penalty": inference_params.presence_penalty,
+                "max_tokens": params.max_tokens,
+                "temperature": params.temperature,
+                "top_p": params.top_p,
+                "frequency_penalty": params.frequency_penalty,
+                "presence_penalty": params.presence_penalty,
             }
 
             response = requests.post(
@@ -270,18 +280,18 @@ class GeminiClient(LLMClient):
     Uses the Gemini Pro model via the generativelanguage API.
     """
 
-    API_URL_TEMPLATE = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-pro:generateContent"
-    )
+    DEFAULT_MODEL = "gemini-pro"
+    API_URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model: Optional[str] = None):
         self.api_key = api_key
+        self.model = model or self.DEFAULT_MODEL
 
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], params: Optional[InferenceParams] = None) -> str:
         """Send messages to Gemini API and return generated text."""
+        params = params or inference_params
         try:
-            url = f"{self.API_URL_TEMPLATE}?key={self.api_key}"
+            url = f"{self.API_URL_BASE}/{self.model}:generateContent?key={self.api_key}"
             headers = {"Content-Type": "application/json"}
 
             # Convert messages to Gemini format
@@ -289,9 +299,9 @@ class GeminiClient(LLMClient):
             payload = {
                 "contents": contents,
                 "generationConfig": {
-                    "temperature": inference_params.temperature,
-                    "topP": inference_params.top_p,
-                    "maxOutputTokens": inference_params.max_tokens,
+                    "temperature": params.temperature,
+                    "topP": params.top_p,
+                    "maxOutputTokens": params.max_tokens,
                 },
             }
 
@@ -374,31 +384,41 @@ class GeminiClient(LLMClient):
         return contents
 
 
-def create_llm_client(provider: str, api_key: str) -> LLMClient:
+def create_llm_client(provider: str, api_key: str, model: Optional[str] = None) -> LLMClient:
     """Factory function to create the appropriate LLM client.
 
     Args:
-        provider: Name of the LLM provider ("groq", "huggingface", or "gemini").
-        api_key: API key for the chosen provider.
+        provider: Name of the LLM provider ("groq", "huggingface", "gemini", or "local").
+        api_key: API key for the chosen provider (ignored for "local").
+        model: Optional model name/path override. Defaults to the provider's
+            built-in default model when omitted.
 
     Returns:
         An instance of the appropriate LLMClient subclass.
 
     Raises:
         ValueError: If the provider name is not recognized.
+        NotImplementedError: If the provider is "local" — this build ships without
+            a local inference backend. Wire your on-site local LLM client in here.
     """
     provider_lower = provider.lower().strip()
 
     if provider_lower == "groq":
-        return GroqClient(api_key)
+        return GroqClient(api_key, model=model)
     elif provider_lower in ("huggingface", "hf"):
-        return HuggingFaceClient(api_key)
+        return HuggingFaceClient(api_key, model=model)
     elif provider_lower == "gemini":
-        return GeminiClient(api_key)
+        return GeminiClient(api_key, model=model)
+    elif provider_lower in ("local", "local_llm"):
+        # Extension point: this build has no local inference backend wired in.
+        raise NotImplementedError(
+            "Provider 'local' is recognized but not implemented in this build. "
+            "Plug in your on-site local LLM client here (must implement LLMClient.chat)."
+        )
     else:
         raise ValueError(
             f"Unknown LLM provider: '{provider}'. "
-            f"Supported providers: groq, huggingface, gemini"
+            f"Supported providers: groq, huggingface, gemini, local"
         )
 
 
@@ -431,7 +451,7 @@ class FailoverLLMClient(LLMClient):
         self.clients = clients
         self.current_index = 0
 
-    def chat(self, messages: list[dict]) -> str:
+    def chat(self, messages: list[dict], params: Optional[InferenceParams] = None) -> str:
         """Try each provider in order until one succeeds.
 
         A "failure" is defined as returning one of the known fallback error messages.
@@ -443,7 +463,7 @@ class FailoverLLMClient(LLMClient):
             idx = (self.current_index + i) % len(self.clients)
             provider_name, client = self.clients[idx]
 
-            response = client.chat(messages)
+            response = client.chat(messages, params)
 
             # Check if this is a failure response
             if response in self.FAILOVER_INDICATORS:

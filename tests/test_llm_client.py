@@ -19,6 +19,8 @@ from app.llm_client import (
     GroqClient,
     HuggingFaceClient,
     GeminiClient,
+    InferenceParams,
+    inference_params,
     create_llm_client,
     FALLBACK_CONNECTION_ERROR,
     FALLBACK_RATE_LIMIT,
@@ -397,6 +399,92 @@ class TestGeminiClient:
         assert contents[0]["role"] == "user"
         assert "You are Jarvis." in contents[0]["parts"][0]["text"]
         assert "Hello" in contents[0]["parts"][0]["text"]
+
+
+class TestPerCallParamsAndModelOverride:
+    """Phase 1: per-session params/model overrides used by the coding agent.
+
+    Passing `params` to `chat()` must not require mutating the shared
+    module-level `inference_params`, and passing `model=` at construction
+    must change the model sent in the request payload.
+    """
+
+    def test_groq_uses_explicit_params_over_global(self):
+        client = GroqClient(api_key="test-key", model="custom-groq-model")
+        custom_params = InferenceParams(temperature=0.11, max_tokens=42)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.iter_lines.return_value = [
+            'data: {"choices":[{"delta":{"content":"ok"}}]}',
+            "data: [DONE]",
+        ]
+
+        with patch("app.llm_client.requests.post", return_value=mock_response) as mock_post:
+            client.chat([{"role": "user", "content": "hi"}], params=custom_params)
+
+        sent_payload = mock_post.call_args.kwargs["json"]
+        assert sent_payload["model"] == "custom-groq-model"
+        assert sent_payload["temperature"] == 0.11
+        assert sent_payload["max_tokens"] == 42
+
+    def test_huggingface_uses_explicit_params_over_global(self):
+        client = HuggingFaceClient(api_key="test-key", model="custom-hf-model")
+        custom_params = InferenceParams(temperature=0.22, max_tokens=99)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"choices": [{"message": {"content": "ok"}}]}
+
+        with patch("app.llm_client.requests.post", return_value=mock_response) as mock_post:
+            client.chat([{"role": "user", "content": "hi"}], params=custom_params)
+
+        sent_payload = mock_post.call_args.kwargs["json"]
+        assert sent_payload["model"] == "custom-hf-model"
+        assert sent_payload["temperature"] == 0.22
+        assert sent_payload["max_tokens"] == 99
+
+    def test_gemini_uses_explicit_params_and_model_in_url(self):
+        client = GeminiClient(api_key="test-key", model="gemini-custom")
+        custom_params = InferenceParams(temperature=0.33, max_tokens=77)
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": "ok"}]}}]
+        }
+
+        with patch("app.llm_client.requests.post", return_value=mock_response) as mock_post:
+            client.chat([{"role": "user", "content": "hi"}], params=custom_params)
+
+        called_url = mock_post.call_args.args[0]
+        sent_payload = mock_post.call_args.kwargs["json"]
+        assert "gemini-custom" in called_url
+        assert sent_payload["generationConfig"]["temperature"] == 0.33
+        assert sent_payload["generationConfig"]["maxOutputTokens"] == 77
+
+    def test_omitting_params_falls_back_to_global_singleton(self):
+        """Backward compatibility: existing callers that don't pass params keep working."""
+        client = GroqClient(api_key="test-key")
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.iter_lines.return_value = ["data: [DONE]"]
+
+        with patch("app.llm_client.requests.post", return_value=mock_response) as mock_post:
+            client.chat([{"role": "user", "content": "hi"}])
+
+        sent_payload = mock_post.call_args.kwargs["json"]
+        assert sent_payload["model"] == GroqClient.MODEL
+        assert sent_payload["temperature"] == inference_params.temperature
+
+    def test_create_llm_client_passes_model_through(self):
+        client = create_llm_client("groq", "key", model="another-model")
+        assert client.model == "another-model"
+
+    def test_create_llm_client_local_provider_not_implemented(self):
+        with pytest.raises(NotImplementedError):
+            create_llm_client("local", "unused")
+
+    def test_create_llm_client_unknown_provider_raises(self):
+        with pytest.raises(ValueError):
+            create_llm_client("carrier-pigeon", "unused")
 
     def test_message_conversion_roles(self):
         """User and assistant roles are correctly mapped."""

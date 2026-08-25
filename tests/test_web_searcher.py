@@ -297,7 +297,11 @@ class TestErrorHandling:
 
         with patch("app.web_searcher.DDGS") as mock_ddgs_class:
             mock_ddgs_instance = MagicMock()
-            mock_ddgs_instance.text.return_value = []
+            # Non-empty result so the search succeeds on the first attempt
+            # (an empty result triggers WebSearcher's built-in retry).
+            mock_ddgs_instance.text.return_value = [
+                {"title": "Title", "href": "https://example.com", "body": "Snippet"}
+            ]
             mock_ddgs_instance.__enter__ = MagicMock(return_value=mock_ddgs_instance)
             mock_ddgs_instance.__exit__ = MagicMock(return_value=False)
             mock_ddgs_class.return_value = mock_ddgs_instance

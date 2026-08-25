@@ -13,6 +13,7 @@ from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
 from app import create_app
+from app.auth import AuthManager
 from app.config import Config
 
 
@@ -26,10 +27,15 @@ def app():
         "LLM_API_KEY": "test_key",
         "LLM_PROVIDER": "groq",
     }
-    with patch.dict(os.environ, env, clear=True):
+    # Isolate from the real .env file on disk (which sets WEB_PASSWORD), so
+    # auth stays disabled here as the explicit env dict above intends.
+    with patch.dict(os.environ, env, clear=True), patch("app.config.load_dotenv"):
         config = Config()
         app = create_app(config)
         app.config["TESTING"] = True
+        # WEB_PASSWORD is unset above, so AuthManager runs in disabled mode
+        # (is_authenticated() always True) — mirrors production wiring in run.py.
+        app.config["AUTH_MANAGER"] = AuthManager(config)
         return app
 
 

@@ -7,6 +7,11 @@ formatted results with title, URL, and snippet fields.
 import logging
 import time
 
+try:
+    from ddgs import DDGS
+except ImportError:
+    from duckduckgo_search import DDGS
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,17 +56,9 @@ class WebSearcher:
         return []
 
     def _do_search(self, query: str, max_results: int) -> list[dict]:
-        """Execute a single search attempt. Tries ddgs first, falls back to duckduckgo_search."""
-        try:
-            # Try the new 'ddgs' package first
-            from ddgs import DDGS
-            ddgs = DDGS()
-            raw_results = list(ddgs.text(query, max_results=max_results))
-        except ImportError:
-            # Fall back to old package name
-            from duckduckgo_search import DDGS
-            ddgs = DDGS()
-            raw_results = list(ddgs.text(query, max_results=max_results))
+        """Execute a single search attempt."""
+        ddgs = DDGS()
+        raw_results = list(ddgs.text(query, max_results=max_results))
 
         logger.info("DuckDuckGo returned %d results for '%s'", len(raw_results), query[:50])
 

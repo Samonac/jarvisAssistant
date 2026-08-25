@@ -46,7 +46,9 @@ class TestProperty10MissingEnvVars:
             if var != missing_var:
                 env[var] = "test_value"
 
-        with patch.dict(os.environ, env, clear=True):
+        # Isolate from the real .env file on disk, which would otherwise refill
+        # the cleared vars via load_dotenv() and mask the missing-var behavior.
+        with patch.dict(os.environ, env, clear=True), patch("app.config.load_dotenv"):
             with pytest.raises(ConfigError) as exc_info:
                 Config()
 
@@ -70,7 +72,9 @@ class TestProperty10MissingEnvVars:
             if var not in missing_vars:
                 env[var] = "test_value"
 
-        with patch.dict(os.environ, env, clear=True):
+        # Isolate from the real .env file on disk, which would otherwise refill
+        # the cleared vars via load_dotenv() and mask the missing-var behavior.
+        with patch.dict(os.environ, env, clear=True), patch("app.config.load_dotenv"):
             with pytest.raises(ConfigError) as exc_info:
                 Config()
 

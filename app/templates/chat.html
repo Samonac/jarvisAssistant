@@ -491,9 +491,14 @@ function chatApp() {
 
         // ── Notifications polling ─────────────────────────────────────────────
         async pollNotifications() {
-            setInterval(async () => {
+            const interval = setInterval(async () => {
                 try {
                     const resp = await fetch('/api/notifications', {credentials: 'same-origin'});
+                    if (resp.status === 401) {
+                        clearInterval(interval); // session expired — stop polling and send the user to log back in
+                        window.location.href = '/login';
+                        return;
+                    }
                     if (resp.ok) {
                         const notifications = await resp.json();
                         for (const n of notifications) {

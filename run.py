@@ -292,6 +292,21 @@ def main():
     flow_engine.conversation_manager = conversation_manager
     app.config["FLOW_ENGINE"] = flow_engine
 
+    # Initialize autopilot (nightly self-improvement mode) — disabled by default,
+    # enabled/paused/stopped via chat ("start/pause/stop autopilot mode") or the API.
+    from app.autopilot.manager import AutopilotManager
+    autopilot_manager = AutopilotManager(
+        config=config,
+        db_manager=db_manager,
+        project_dir=project_dir,
+        notes_manager=notes_manager,
+        system_monitor=system_monitor,
+        kb_manager=kb_manager,
+    )
+    autopilot_manager.start_thread()
+    conversation_manager.autopilot_manager = autopilot_manager
+    app.config["AUTOPILOT_MANAGER"] = autopilot_manager
+
     # Give the conversation manager access to the scheduler for acknowledgment
     conversation_manager.scheduler = scheduler
 

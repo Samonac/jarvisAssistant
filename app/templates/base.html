@@ -71,11 +71,15 @@
                 }, 2000);
 
                 // Also poll notifications for browser push
-                setInterval(async () => {
+                const notifInterval = setInterval(async () => {
                     const perms = JSON.parse(localStorage.getItem('jarvis_permissions') || '{}');
                     if (!perms.notifications) return;
                     try {
                         const r = await fetch('/api/notifications');
+                        if (r.status === 401) {
+                            clearInterval(notifInterval); // session no longer valid — stop spamming 401s
+                            return;
+                        }
                         if (r.ok) {
                             const notifs = await r.json();
                             for (const n of notifs) {

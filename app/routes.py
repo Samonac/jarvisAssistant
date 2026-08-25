@@ -77,6 +77,11 @@ def register_routes(app: Flask) -> None:
         # Legacy: if no IAM or no user, check session
         if session.get("authenticated"):
             return list(PERMISSION_GROUPS.keys())
+        # Auth entirely disabled (no WEB_PASSWORD configured) grants full
+        # access, consistent with AuthManager.is_authenticated()'s own bypass.
+        auth = _get_auth_manager()
+        if auth and not auth.enabled:
+            return list(PERMISSION_GROUPS.keys())
         return []
 
     def _is_authenticated():
@@ -385,6 +390,7 @@ def register_routes(app: Flask) -> None:
                     "disk_used_gb": metrics.disk_used_gb,
                     "disk_total_gb": metrics.disk_total_gb,
                     "disk_percent": metrics.disk_percent,
+                    "cpu_temp_celsius": metrics.cpu_temp_celsius,
                 }
             )
 
@@ -397,6 +403,7 @@ def register_routes(app: Flask) -> None:
                 "disk_used_gb": 0.0,
                 "disk_total_gb": 0.0,
                 "disk_percent": 0.0,
+                "cpu_temp_celsius": -1.0,
             }
         )
 
@@ -1058,7 +1065,7 @@ def register_routes(app: Flask) -> None:
             logger.info("Manual restart triggered")
             file_watcher = app.config.get("FILE_WATCHER")
             if file_watcher:
-                file_watcher._restart(self=file_watcher)
+                file_watcher._restart()
             else:
                 import os, sys
                 os._exit(0)

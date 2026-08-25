@@ -23,6 +23,7 @@ class SystemMetrics:
     disk_total_gb: float
     disk_percent: float
     uptime_seconds: float
+    cpu_temp_celsius: float
 
 
 class SystemMonitor:
@@ -59,6 +60,7 @@ class SystemMonitor:
         ram_used_mb, ram_total_mb, ram_percent = self._read_memory()
         disk_used_gb, disk_total_gb, disk_percent = self._read_disk()
         uptime_seconds = self._read_uptime()
+        cpu_temp_celsius = self._read_cpu_temp()
 
         return SystemMetrics(
             cpu_percent=cpu_percent,
@@ -69,6 +71,7 @@ class SystemMonitor:
             disk_total_gb=disk_total_gb,
             disk_percent=disk_percent,
             uptime_seconds=uptime_seconds,
+            cpu_temp_celsius=cpu_temp_celsius,
         )
 
     def _read_cpu_usage(self) -> float:
@@ -185,6 +188,20 @@ class SystemMonitor:
             return uptime_seconds
         except (OSError, IOError, ValueError, IndexError) as e:
             logger.warning("Failed to read uptime: %s", e)
+            return -1.0
+
+    def _read_cpu_temp(self) -> float:
+        """Read the SoC temperature from the Linux thermal zone (Raspberry Pi and most ARM boards).
+
+        Returns:
+            Temperature in Celsius. Returns -1 on error or if unavailable (e.g. non-Linux dev machine).
+        """
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                millidegrees = float(f.readline().strip())
+            return round(millidegrees / 1000.0, 1)
+        except (OSError, IOError, ValueError) as e:
+            logger.debug("Failed to read CPU temperature: %s", e)
             return -1.0
 
     def check_warnings(self) -> list[str]:

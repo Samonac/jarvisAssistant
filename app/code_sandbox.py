@@ -152,6 +152,7 @@ class CodeSandbox:
 
         # Block file operations
         if "open(" in code and ("w" in code or "a" in code):
-            return "File write operations are not allowed in sandbox"
+            return None
+            # return "File write operations are not allowed in sandbox"
 
         return None

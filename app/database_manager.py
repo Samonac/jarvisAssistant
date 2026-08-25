@@ -330,6 +330,34 @@ class DatabaseManager:
         conn.commit()
         return cursor.rowcount
 
+    def get_messages_since(self, since: datetime) -> dict[str, list[dict]]:
+        """Retrieve all messages recorded after `since`, grouped by username.
+
+        Used by the nightly memory consolidator to summarize a day's Q&A per
+        user. Messages from anonymous/no-login sessions (no username) are
+        grouped under the empty-string key.
+        """
+        conn = self._get_connection()
+        since_str = since.strftime("%Y-%m-%d %H:%M:%S")
+        cursor = conn.execute(
+            """
+            SELECT username, role, content, timestamp
+            FROM conversations
+            WHERE timestamp > ?
+            ORDER BY username, timestamp ASC, id ASC
+            """,
+            (since_str,),
+        )
+        grouped: dict[str, list[dict]] = {}
+        for row in cursor.fetchall():
+            username = row["username"] or ""
+            grouped.setdefault(username, []).append({
+                "role": row["role"],
+                "content": row["content"],
+                "timestamp": row["timestamp"],
+            })
+        return grouped
+
     # --- Notes CRUD ---
 
     def save_note(
