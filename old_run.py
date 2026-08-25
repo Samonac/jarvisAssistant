@@ -187,7 +187,6 @@ def main():
     app = create_app(config)
 
     # Store components on app for route access
-    app.config["CONFIG"] = config
     app.config["CONVERSATION_MANAGER"] = conversation_manager
     app.config["METRICS_COLLECTOR"] = metrics_collector
     app.config["SYSTEM_MONITOR"] = system_monitor

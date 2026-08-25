@@ -2215,28 +2215,19 @@ class ConversationManager:
             if len(history) > 4:  # More than 2 pairs = not the first exchange
                 return
 
-            # Generate title using LLM — use quick_chat to avoid thinking overhead
-            title_prompt = (
-                f"Generate a very short title (3-6 words max) for a conversation "
-                f"that starts with: {user_message[:200]!r}. "
-                f"Return ONLY the title, no quotes, no punctuation at the end."
-            )
-            from app.llm_client import GatewayClient
-            if isinstance(self.llm_client, GatewayClient):
-                title = self.llm_client.quick_chat(title_prompt)
-            else:
-                # Fallover clients — use the underlying gateway if available,
-                # otherwise fall back to the original approach
-                from app.llm_client import FailoverLLMClient
-                underlying = self.llm_client
-                if isinstance(underlying, FailoverLLMClient):
-                    label, first_client = underlying.clients[0]
-                    if isinstance(first_client, GatewayClient):
-                        title = first_client.quick_chat(title_prompt)
-                    else:
-                        title = self.llm_client.chat(title_messages)
-                else:
-                    title = self.llm_client.chat(title_messages)
+            # Generate title using LLM
+            title_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Generate a very short title (3-6 words max) for a conversation "
+                        "that starts with the following message. Return ONLY the title, "
+                        "nothing else. No quotes, no punctuation at the end."
+                    ),
+                },
+                {"role": "user", "content": user_message[:200]},
+            ]
+            title = self.llm_client.chat(title_messages)
 
             # Clean up the title
             title = title.strip().strip('"\'').strip()

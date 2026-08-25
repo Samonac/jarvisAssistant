@@ -49,21 +49,15 @@ class Config:
     Optional variables with defaults are documented in .env.example.
     """
 
-    # LLM_API_KEY / LLM_PROVIDER are optional when LLM_GATEWAY_URL is set.
-    REQUIRED_VARS: list[str] = []
+    REQUIRED_VARS = ["LLM_API_KEY", "LLM_PROVIDER"]
 
     def __init__(self):
         # Load .env file if present
         load_dotenv()
 
-        # Gateway URL takes precedence; cloud keys are optional fallbacks
-        gateway_url = os.environ.get("LLM_GATEWAY_URL", "http://192.168.1.52:8000")
-
-        # LLM_PROVIDER / LLM_API_KEY default gracefully so the gateway-only
-        # setup doesn't require them to be set.
-        self.llm_api_key: str = os.environ.get("LLM_API_KEY", "")
-        self.llm_provider: str = os.environ.get("LLM_PROVIDER", "gateway")
-        _ = gateway_url  # consumed later via os.environ in llm_client
+        # Required variables
+        self.llm_api_key: str = self._require("LLM_API_KEY")
+        self.llm_provider: str = self._require("LLM_PROVIDER")
 
         # Optional per-provider API keys for failover
         # Discovers ALL keys matching the pattern: PROVIDER_API_KEY, PROVIDER_API_KEY_2, PROVIDER_API_KEY_3, etc.
@@ -76,16 +70,7 @@ class Config:
         self.huggingface_api_key: str | None = self.huggingface_api_keys[0] if self.huggingface_api_keys else None
         self.gemini_api_key: str | None = self.gemini_api_keys[0] if self.gemini_api_keys else None
 
-        # Streaming chat responses (token-by-token SSE)
-        # Set to true to enable streaming; requires gateway running
-        self.chat_streaming: bool = os.environ.get("CHAT_STREAMING", "false").lower() in ("1", "true", "yes")
-
-        # Local LLM Gateway URL (FastAPI on the Mac)
-        self.llm_gateway_url: str = os.environ.get(
-            "LLM_GATEWAY_URL", "http://192.168.1.52:8000"
-        )
-
-        # Failover order (comma-separated provider names, e.g., "gateway,groq,huggingface")
+        # Failover order (comma-separated provider names, e.g., "groq,huggingface,gemini")
         self.llm_failover_order: list[str] = [
             p.strip() for p in os.environ.get("LLM_FAILOVER_ORDER", "").split(",") if p.strip()
         ]
@@ -217,7 +202,12 @@ class Config:
 
 
 def load_config() -> Config:
-    """Load configuration, logging errors and exiting if required vars are missing."""
+    """Load configuration, logging errors and exiting if required vars are missing.
+
+    This is the main entry point for configuration loading at startup.
+    If required environment variables are missing, logs the error and exits
+    with a non-zero status code.
+    """
     try:
         return Config()
     except ConfigError as e:
