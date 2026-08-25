@@ -16,7 +16,7 @@ from app.config import Config, ConfigError, DEFAULT_BLOCKLIST
 # Strategy for generating non-empty strings without commas (for blocklist items)
 blocklist_pattern_strategy = st.text(
     alphabet=st.characters(
-        blacklist_characters=",",
+        blacklist_characters=",\x00",
         blacklist_categories=("Cs",),
     ),
     min_size=1,

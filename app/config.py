@@ -49,15 +49,19 @@ class Config:
     Optional variables with defaults are documented in .env.example.
     """
 
-    # LLM_API_KEY / LLM_PROVIDER are optional when LLM_GATEWAY_URL is set.
-    REQUIRED_VARS: list[str] = []
+    # Cloud credentials are optional when an explicit gateway is configured.
+    REQUIRED_VARS = ["LLM_API_KEY", "LLM_PROVIDER"]
 
     def __init__(self):
         # Load .env file if present
         load_dotenv()
 
-        # Gateway URL takes precedence; cloud keys are optional fallbacks
+        # Gateway URL takes precedence; cloud keys are optional fallbacks.
         gateway_url = os.environ.get("LLM_GATEWAY_URL", "http://192.168.1.52:8000")
+
+        if not os.environ.get("LLM_GATEWAY_URL"):
+            self._require("LLM_API_KEY")
+            self._require("LLM_PROVIDER")
 
         # LLM_PROVIDER / LLM_API_KEY default gracefully so the gateway-only
         # setup doesn't require them to be set.

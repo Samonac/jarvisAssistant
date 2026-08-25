@@ -555,6 +555,8 @@ class GroqClient(LLMClient):
             return FALLBACK_CONNECTION_ERROR
         except requests.exceptions.ConnectionError:
             return FALLBACK_NETWORK_ERROR
+        except (socket.gaierror, OSError):
+            return FALLBACK_NETWORK_ERROR
         except Exception as exc:
             logger.error("Groq unexpected error: %s", exc)
             return FALLBACK_GENERIC_ERROR
@@ -792,6 +794,10 @@ def create_llm_client(
     provider_lower = provider.lower().strip()
     if provider_lower == "gateway":
         return GatewayClient(api_key)  # api_key is the base URL here
+    elif provider_lower in ("local", "local_llm"):
+        raise NotImplementedError(
+            "Provider 'local' is recognized but not implemented in this build."
+        )
     elif provider_lower == "groq":
         return GroqClient(api_key, model=model)
     elif provider_lower in ("huggingface", "hf"):
