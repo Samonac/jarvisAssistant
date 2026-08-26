@@ -242,6 +242,15 @@ def _select_profile(messages: list[dict]) -> str:
     return "fast"
 
 
+def _requested_profile(messages: list[dict]) -> Optional[str]:
+    """Return an internal profile hint supplied by an orchestrator."""
+    for message in messages:
+        profile = message.get("_profile")
+        if profile in {"fast", "coding", "reasoning"}:
+            return profile
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Abstract base (unchanged public contract)
 # ---------------------------------------------------------------------------
@@ -263,6 +272,15 @@ class LLMClient(ABC):
         Returns:
             Generated text string.  On error returns a FALLBACK_* constant.
         """
+
+    def set_progress_callback(self, callback) -> None:
+        """Register a callback for request lifecycle progress events."""
+        self._progress_callback = callback
+
+    def _emit_progress(self, event: dict) -> None:
+        callback = getattr(self, "_progress_callback", None)
+        if callback:
+            callback(event)
 
 
 # ---------------------------------------------------------------------------
@@ -311,19 +329,15 @@ class GatewayClient(LLMClient):
                 logger.info("Think mode DISABLED for session")
 
         # Profile: session think_mode overrides content heuristics
-        if self._think_mode:
+        requested_profile = _requested_profile(messages)
+        if requested_profile:
+            profile = requested_profile
+        elif self._think_mode:
             profile = "reasoning"
         else:
             profile = _select_profile(messages)
 
         simple = (not self._think_mode) and _check_simple_query(messages)
-        logger.info(
-            "Gateway request — profile: %s%s%s",
-            profile,
-            " [think_mode]" if self._think_mode else "",
-            " [simple]" if simple else "",
-        )
-
         # Separate system messages from the conversation
         system_content = None
         conv_messages = []
@@ -354,6 +368,24 @@ class GatewayClient(LLMClient):
         if system_content:
             payload["system"] = system_content
 
+        prompt_preview = "\n".join(
+            f"{message.get('role', 'user')}: {message.get('content', '')}"
+            for message in conv_messages
+        )
+        prompt_preview = (f"system: {system_content}\n" if system_content else "") + prompt_preview
+        logger.info(
+            "Gateway request — profile: %s%s%s prompt: %s",
+            profile,
+            " [think_mode]" if self._think_mode else "",
+            " [simple]" if simple else "",
+            prompt_preview[-4000:],
+        )
+        self._emit_progress({
+            "type": "gateway_request",
+            "profile": profile,
+            "prompt": prompt_preview,
+        })
+
         try:
             timeout = REQUEST_TIMEOUT_REASONING if profile == "reasoning" else REQUEST_TIMEOUT
             resp = requests.post(
@@ -364,10 +396,22 @@ class GatewayClient(LLMClient):
 
             if resp.status_code == 429:
                 logger.warning("Gateway rate limit")
+                self._emit_progress({
+                    "type": "gateway_response",
+                    "profile": profile,
+                    "reply": FALLBACK_RATE_LIMIT,
+                    "status_code": resp.status_code,
+                })
                 return FALLBACK_RATE_LIMIT
 
             if resp.status_code >= 400:
                 logger.error("Gateway error: %d %s", resp.status_code, resp.text[:200])
+                self._emit_progress({
+                    "type": "gateway_response",
+                    "profile": profile,
+                    "reply": FALLBACK_GENERIC_ERROR,
+                    "status_code": resp.status_code,
+                })
                 return FALLBACK_GENERIC_ERROR
 
             data = resp.json()
@@ -377,20 +421,38 @@ class GatewayClient(LLMClient):
                 return FALLBACK_GENERIC_ERROR
 
             logger.info(
-                "Gateway response — model: %s  prompt: %d  completion: %d  total: %d  %.0f ms",
+                "Gateway response — model: %s  prompt: %d  completion: %d  total: %d  %.0f ms reply: %s",
                 data.get("model", "?"),
                 data.get("prompt_tokens", 0),
                 data.get("completion_tokens", 0),
                 data.get("total_tokens", 0),
                 data.get("latency_ms", 0),
+                content[:4000],
             )
+            self._emit_progress({
+                "type": "gateway_response",
+                "profile": profile,
+                "model": data.get("model", "?"),
+                "reply": content,
+                "latency_ms": data.get("latency_ms", 0),
+            })
             return content
 
         except requests.exceptions.Timeout:
             logger.error("Timeout waiting for gateway (%s)", self._chat_url)
+            self._emit_progress({
+                "type": "gateway_response",
+                "profile": profile,
+                "reply": FALLBACK_CONNECTION_ERROR,
+            })
             return FALLBACK_CONNECTION_ERROR
         except requests.exceptions.ConnectionError:
             logger.error("Cannot reach gateway at %s", self.base_url)
+            self._emit_progress({
+                "type": "gateway_response",
+                "profile": profile,
+                "reply": FALLBACK_NETWORK_ERROR,
+            })
             return FALLBACK_NETWORK_ERROR
         except (socket.gaierror, OSError) as exc:
             logger.error("Network error reaching gateway: %s", exc)
@@ -713,6 +775,11 @@ class FailoverLLMClient(LLMClient):
         self.clients = clients
         self.current_index = 0
 
+    def set_progress_callback(self, callback) -> None:
+        self._progress_callback = callback
+        for _, client in self.clients:
+            client.set_progress_callback(callback)
+
     def chat(
         self,
         messages: list[dict],
@@ -737,6 +804,10 @@ class FailoverLLMClient(LLMClient):
     @staticmethod
     def _truncate_repetition(text: str, max_repeats: int = 3) -> str:
         if not text or len(text) < 100:
+            return text
+        # Never inject a truncation marker into source code returned for a
+        # write/repair operation.
+        if "```" in text:
             return text
         lines = text.split("\n")
         if len(lines) > 5:

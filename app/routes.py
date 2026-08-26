@@ -232,7 +232,7 @@ def register_routes(app: Flask) -> None:
             agent_steps = conversation_manager._last_agent_steps
             conversation_manager._last_agent_steps = []
         except Exception as e:
-            logger.error("Conversation error: %s", e)
+            logger.exception("Conversation error while handling session %s", session_id)
             response_text = (
                 "I apologize, Sir. An internal error has occurred. "
                 "Please try again momentarily."
@@ -249,6 +249,14 @@ def register_routes(app: Flask) -> None:
                         setattr(inference_params, k, v)
 
         return jsonify({"response": response_text, "session_id": session_id, "agent_steps": agent_steps})
+
+    @app.route("/api/chat-progress/<session_id>", methods=["GET"])
+    def chat_progress(session_id):
+        """Return gateway lifecycle events collected for a chat session."""
+        conversation_manager = app.config.get("CONVERSATION_MANAGER")
+        if not conversation_manager:
+            return jsonify([])
+        return jsonify(conversation_manager.get_progress_events(session_id))
 
     @app.route("/chat/stream", methods=["POST"])
     def chat_stream():
@@ -442,6 +450,7 @@ def register_routes(app: Flask) -> None:
                 "reminder_window_minutes": config.reminder_window_minutes,
                 "database_path": config.database_path,
                 "retention_days": config.retention_days,
+                "agent_mode_enabled": config.agent_mode_enabled,
             }
         )
 
@@ -468,6 +477,7 @@ def register_routes(app: Flask) -> None:
             "max_history_pairs": lambda v: isinstance(v, int) and v > 0,
             "reminder_window_minutes": lambda v: isinstance(v, int) and v > 0,
             "retention_days": lambda v: isinstance(v, int) and v > 0,
+            "agent_mode_enabled": lambda v: isinstance(v, bool),
         }
 
         if key not in updatable_keys:
@@ -477,9 +487,10 @@ def register_routes(app: Flask) -> None:
             )
 
         if not updatable_keys[key](value):
+            expected = "a boolean" if key == "agent_mode_enabled" else "a positive integer"
             return (
                 jsonify(
-                    {"error": f"Invalid value for '{key}': must be a positive integer"}
+                    {"error": f"Invalid value for '{key}': must be {expected}"}
                 ),
                 400,
             )

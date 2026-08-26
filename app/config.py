@@ -84,6 +84,11 @@ class Config:
         # Set to true to enable streaming; requires gateway running
         self.chat_streaming: bool = os.environ.get("CHAT_STREAMING", "false").lower() in ("1", "true", "yes")
 
+        # Agent/Autopilot mode: when enabled, Jarvis can plan and execute
+        # multi-step tool sequences. When disabled, all queries use the fast
+        # single-shot path (lower latency, no planning overhead).
+        self.agent_mode_enabled: bool = os.environ.get("AGENT_MODE", "true").lower() in ("1", "true", "yes")
+
         # Local LLM Gateway URL (FastAPI on the Mac)
         self.llm_gateway_url: str = os.environ.get(
             "LLM_GATEWAY_URL", "http://192.168.1.52:8000"

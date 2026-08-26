@@ -1,12 +1,158 @@
 """Unit tests for CodingAgentLoop (app.coding_agent.loop)."""
 
 from unittest.mock import MagicMock
+from pathlib import Path
 
 import pytest
 
 from app.agent_session import AgentSessionConfig
 from app.coding_agent.loop import CodingAgentLoop
 from app.coding_agent.tools import CodingAgentTools
+
+
+def test_legacy_agent_recovery_prompt_offers_choices():
+    from app.agent import AgentExecutor
+
+    prompt = AgentExecutor._recovery_prompt("run_code", "Error:\nSyntaxError")
+
+    assert "[1] I will repair the code and retry it" in prompt
+    assert "[2] Retry the original code" in prompt
+    assert "[3] Cancel this operation" in prompt
+
+
+def test_legacy_agent_resolves_vague_run_request_to_last_written_python_file():
+    from app.agent import AgentExecutor
+
+    tool_args = AgentExecutor._resolve_run_command(
+        {"command": "file"},
+        [{"tool": "write_file", "args": {"path": "screenshot_test.py"}}],
+    )
+
+    assert tool_args == {"command": 'python "screenshot_test.py"'}
+
+
+def test_legacy_agent_preserves_explicit_run_command():
+    from app.agent import AgentExecutor
+
+    tool_args = AgentExecutor._resolve_run_command(
+        {"command": "python other_file.py"},
+        [{"tool": "write_file", "args": {"path": "screenshot_test.py"}}],
+    )
+
+    assert tool_args == {"command": "python other_file.py"}
+
+
+def test_legacy_agent_resolves_run_it_anyway_to_last_written_file():
+    from app.agent import AgentExecutor
+
+    tool_args = AgentExecutor._resolve_run_command(
+        {"command": "it anyway"},
+        [{"tool": "write_file", "args": {"path": "app.js"}}],
+    )
+
+    assert tool_args == {"command": 'node "app.js"'}
+
+
+def test_agent_normalizes_unknown_planning_tools():
+    from app.agent import AgentExecutor
+
+    plan = AgentExecutor._normalize_plan({
+        "plan": True,
+        "steps": ["Check the application"],
+        "tools_needed": ["windows_session_check", "run_command"],
+    })
+
+    assert plan["tools_needed"] == ["run_command"]
+    assert plan["unsupported_tools"] == ["windows_session_check"]
+
+
+def test_tool_output_failure_detection_catches_windows_missing_script():
+    from app.agent import AgentExecutor
+
+    output = "Command failed (exit code 2).\ncan't open file 'your_script.py'"
+
+    assert AgentExecutor._tool_output_failed(output)
+    assert AgentExecutor._needs_file_discovery(output)
+
+
+def test_agent_extracts_missing_python_dependency():
+    from app.agent import AgentExecutor
+
+    assert AgentExecutor._missing_python_dependency(
+        "ModuleNotFoundError: No module named 'pyautogui'"
+    ) == "pyautogui"
+
+
+def test_agent_does_not_repeat_same_tool_action():
+    from app.agent import AgentExecutor
+
+    manager = MagicMock()
+    manager._execute_tool.return_value = "Command failed (exit code 2)."
+    agent = AgentExecutor(manager)
+    plan = {"steps": ["run the script"]}
+    agent._get_next_action = MagicMock(return_value={
+        "tool": "run_command", "args": {"command": "python script.py"}
+    })
+
+    result = agent.execute("run the script", "session", [], plan)
+
+    assert result["pending_recovery"]["tool_name"] == "run_command"
+
+
+def test_conversation_manager_resolves_descriptive_python_filename():
+    from app.conversation_manager import ConversationManager
+
+    manager = ConversationManager.__new__(ConversationManager)
+    manager.file_manager = MagicMock()
+    manager.file_manager.list_directory.return_value = {
+        "path": "C:/project",
+        "entries": [
+            {"name": "screenshot_test.py", "type": "file"},
+            {"name": "run.py", "type": "file"},
+        ],
+    }
+
+    resolved = manager._guess_file_path_from_message(
+        "Inspect the screenshot python file"
+    )
+    assert Path(resolved).name == "screenshot_test.py"
+
+
+def test_legacy_agent_forces_first_inspection_action_when_model_says_done():
+    from app.agent import AgentExecutor
+
+    manager = MagicMock()
+    manager._guess_file_path_from_message.return_value = "C:/project/screenshot_test.py"
+    agent = AgentExecutor(manager)
+
+    assert agent._first_inspection_action(
+        "Inspect the screenshot python file"
+    ) == {
+        "tool": "read_file",
+        "args": {"path": "C:/project/screenshot_test.py"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "command"),
+    [
+        ("script.py", 'python "script.py"'),
+        ("script.js", 'node "script.js"'),
+        ("script.ts", 'npx tsx "script.ts"'),
+        ("script.sh", 'bash "script.sh"'),
+        ("script.ps1", 'powershell -NoProfile -ExecutionPolicy Bypass -File "script.ps1"'),
+        ("script.bat", '"script.bat"'),
+    ],
+)
+def test_legacy_agent_resolves_common_file_types(path, command):
+    from app.agent import AgentExecutor
+
+    tool_args = AgentExecutor._resolve_run_command(
+        {"command": "run it"},
+        [{"tool": "write_file", "args": {"path": path}}],
+    )
+
+    assert tool_args == {"command": command}
 
 
 class FakeConfig:

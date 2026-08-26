@@ -32,6 +32,37 @@ def _make_manager(db_path):
     return mgr, db
 
 
+def test_generated_script_requires_approval_before_file_changes():
+    manager = ConversationManager.__new__(ConversationManager)
+    pending = manager._build_pending_code_action(
+        "Save this as bring_to_foreground.py:\n```python\nprint('ok')\n```",
+        "create a script",
+    )
+
+    assert pending["path"] == "bring_to_foreground.py"
+    assert "[1] Save `bring_to_foreground.py` and execute it" in manager._code_action_prompt(pending)
+
+
+def test_approved_script_execution_installs_missing_dependency_and_retries():
+    manager = ConversationManager.__new__(ConversationManager)
+    manager._last_touched_files = {}
+    manager.command_executor = MagicMock()
+    manager.command_executor.execute.side_effect = [
+        {"return_code": 1, "stdout": "", "stderr": "No module named 'pyautogui'"},
+        {"return_code": 0, "stdout": "installed", "stderr": ""},
+        {"return_code": 0, "stdout": "Application is not currently open.", "stderr": ""},
+    ]
+    manager._execute_tool = MagicMock(return_value="Written 10 chars to app.py")
+    manager._last_touched_files["session"] = "app.py"
+    pending = {"path": "app.py", "content": "print('ok')", "request": "create a script"}
+
+    result = manager._resume_code_action("1", pending, "session")
+
+    assert "executed successfully" in result
+    assert manager.command_executor.execute.call_count == 3
+    assert "pip install pyautogui" in manager.command_executor.execute.call_args_list[1].args[0]
+
+
 # Feature: jarvis-assistant, Property 2: System prompt is always first
 class TestProperty2:
     """The message array sent to the LLM always has the Jarvis system prompt first."""

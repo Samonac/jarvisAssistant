@@ -12,7 +12,9 @@ Orchestrates the full conversation flow:
 import json
 import logging
 import re
+from contextvars import ContextVar
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from app.llm_client import LLMClient
@@ -20,6 +22,9 @@ from app.config import Config
 from app.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
+_progress_session: ContextVar[Optional[str]] = ContextVar(
+    "progress_session", default=None
+)
 
 JARVIS_SYSTEM_PROMPT_TEMPLATE = """You are J.A.R.V.I.S. (Just A Rather Very Intelligent System), the personal AI assistant. You speak with a formal, refined British accent and manner. You are witty, precise, and unfailingly polite. You ALWAYS address the user as "{user_honorific}". NEVER switch between "Sir" and "Ma'am" — use ONLY "{user_honorific}" consistently in every response.
 
@@ -188,6 +193,9 @@ class ConversationManager:
 
         # Pending email confirmations keyed by session_id
         self._pending_emails: dict[str, dict] = {}
+        self._pending_agent_recovery: dict[str, dict] = {}
+        self._pending_code_actions: dict[str, dict] = {}
+        self._last_touched_files: dict[str, str] = {}
         self.scheduler = None  # Injected after construction
         self._last_agent_steps: list[dict] = []  # Last agent execution steps
         self.user_prefs_manager = None  # Injected after construction
@@ -195,6 +203,27 @@ class ConversationManager:
         self.code_sandbox = None  # Injected after construction
         self.suggestions_engine = None  # Injected after construction
         self.autopilot_manager = None  # Injected after construction
+        self._progress_events: dict[str, list[dict]] = {}
+        self.llm_client.set_progress_callback(self._record_progress)
+
+    def _record_progress(self, event: dict) -> None:
+        """Store bounded gateway progress for the active chat sessions."""
+        event = dict(event)
+        session_id = event.pop("session_id", None) or _progress_session.get()
+        if not session_id:
+            return
+        event["timestamp"] = datetime.now().strftime("%H:%M:%S")
+        if "prompt" in event:
+            event["prompt"] = event["prompt"][-4000:]
+        if "reply" in event:
+            event["reply"] = event["reply"][:4000]
+        self._progress_events.setdefault(session_id, []).append(event)
+        self._progress_events[session_id] = self._progress_events[session_id][-30:]
+
+    def get_progress_events(self, session_id: str) -> list[dict]:
+        events = self._progress_events.get(session_id, [])
+        self._progress_events[session_id] = []
+        return events
 
     def handle_message(self, message: str, session_id: str) -> str:
         """Process a user message and return the assistant response.
@@ -212,6 +241,7 @@ class ConversationManager:
         import time
 
         start_time = time.time()
+        _progress_session.set(session_id)
 
         # Any chat activity resets the autopilot inactivity clock.
         if self.autopilot_manager:
@@ -220,6 +250,45 @@ class ConversationManager:
         # Check for pending email confirmation
         if session_id in self._pending_emails:
             response = self._handle_email_confirmation(message, session_id)
+            self._persist_exchange(session_id, message, response)
+            return response
+
+        if session_id in self._pending_agent_recovery:
+            from app.agent import AgentExecutor
+
+            pending = self._pending_agent_recovery[session_id]
+            response = AgentExecutor(self).resume_recovery(
+                message, pending, session_id
+            )
+            if response.startswith((
+                "The code could not",
+                "The tool '",
+                "Please choose",
+                "I could not produce",
+            )):
+                self._pending_agent_recovery[session_id] = pending
+            else:
+                self._pending_agent_recovery.pop(session_id, None)
+            self._persist_exchange(session_id, message, response)
+            return response
+
+        if session_id in self._pending_code_actions:
+            response = self._resume_code_action(
+                message, self._pending_code_actions[session_id], session_id
+            )
+            if not response.startswith("Please choose"):
+                self._pending_code_actions.pop(session_id, None)
+            self._persist_exchange(session_id, message, response)
+            return response
+
+        run_file = self._resolve_run_file_followup(message, session_id)
+        if run_file:
+            messages = self._build_messages(session_id, message)
+            response = self._execute_tool_and_summarize(
+                {"tool": "run_command", "args": {"command": run_file}},
+                messages,
+                session_id,
+            )
             self._persist_exchange(session_id, message, response)
             return response
 
@@ -322,21 +391,31 @@ class ConversationManager:
         messages = self._build_messages(session_id, message)
 
         # Check if this query needs multi-step agent processing
-        from app.agent import AgentExecutor
-        agent = AgentExecutor(self)
-        plan = agent.should_use_agent(message, messages)
+        # (only when agent mode is enabled in settings)
+        plan = None
+        if self.config.agent_mode_enabled:
+            from app.agent import AgentExecutor
+            agent = AgentExecutor(self)
+            plan = agent.should_use_agent(message, messages)
 
         if plan:
             # Multi-step agent mode
             logger.info("Agent mode activated for: %s", message[:50])
             result = agent.execute(message, session_id, messages, plan)
             response = result["response"]
+            if result.get("pending_recovery"):
+                self._pending_agent_recovery[session_id] = result["pending_recovery"]
             # Store the thinking steps for the frontend
             self._last_agent_steps = result.get("steps", [])
             self._persist_exchange(session_id, message, response)
             return response
 
         # Normal single-shot mode
+        # When agent mode is disabled, force the "fast" profile for lower latency
+        if not self.config.agent_mode_enabled and messages:
+            messages[0] = dict(messages[0])
+            messages[0]["_profile"] = "fast"
+
         # Call LLM
         raw_response = self.llm_client.chat(messages)
 
@@ -405,10 +484,22 @@ class ConversationManager:
                 else:
                     # Give up — return the original response with a warning
                     response = raw_response
+            elif self._contains_generated_code(raw_response):
+                pending = self._build_pending_code_action(raw_response, message)
+                if pending:
+                    self._pending_code_actions[session_id] = pending
+                    response = self._code_action_prompt(pending)
+                else:
+                    response = raw_response
             elif self._should_have_called_tool(message, raw_response):
                 # The user clearly asked for a tool action but the LLM just responded with text
                 logger.warning("LLM should have called a tool but didn't. Forcing tool call. Message: '%s'", message[:80])
-                forced_tool = self._force_tool_call(message)
+                run_file = self._resolve_run_file_followup(message, session_id)
+                forced_tool = (
+                    {"tool": "run_command", "args": {"command": run_file}}
+                    if run_file
+                    else self._force_tool_call(message)
+                )
                 if forced_tool:
                     logger.info("Forced tool call: %s", forced_tool)
                     response = self._execute_tool_and_summarize(forced_tool, messages, session_id)
@@ -527,6 +618,11 @@ class ConversationManager:
             "run python", "run pip", "run npm", '"dir"', "'dir'",
             "run a command", "launch", "run it",
         ]):
+            if "command output:" not in response.lower() and "Tool 'run_command'" not in response:
+                return True
+
+        # User said: run "something" or run 'something' (quoted command)
+        if re.search(r'\b(?:run|execute)\s*["\u201c\u201d\'`]', msg_lower):
             if "command output:" not in response.lower() and "Tool 'run_command'" not in response:
                 return True
 
@@ -821,6 +917,74 @@ class ConversationManager:
             return match.group(1).strip()
         return ""
 
+    def _contains_generated_code(self, response: str) -> bool:
+        """Detect a generated script that can be offered as a pending action."""
+        return bool(
+            self._extract_code_from_response(response)
+            and re.search(r"\b(script|save|file|execute|run)\b", response, re.IGNORECASE)
+        )
+
+    def _build_pending_code_action(self, response: str, request: str) -> Optional[dict]:
+        code = self._extract_code_from_response(response)
+        if not code:
+            return None
+        filename_match = re.search(
+            r"(?:save|file|script)[^\n`]*(\b[\w.-]+\.(?:py|js|ts|sh|ps1|rb|pl|bat|cmd)\b)",
+            response,
+            re.IGNORECASE,
+        )
+        filename = filename_match.group(1) if filename_match else "generated_script.py"
+        return {"path": filename, "content": code, "request": request}
+
+    @staticmethod
+    def _code_action_prompt(pending: dict) -> str:
+        return (
+            f"I have prepared the script, Sir, but have not changed any files yet. "
+            f"Would you like me to:\n\n"
+            f"[1] Save `{pending['path']}` and execute it\n"
+            f"[2] Save `{pending['path']}` only\n"
+            "[3] Cancel\n\nReply with 1, 2, or 3."
+        )
+
+    def _resume_code_action(self, choice: str, pending: dict, session_id: str) -> str:
+        choice = choice.strip().lower()
+        if choice in {"3", "cancel"}:
+            return "Understood, Sir. The script has not been saved or executed."
+        if choice not in {"1", "2", "save and execute", "save only"}:
+            return self._code_action_prompt(pending)
+
+        write_result = self._execute_tool(
+            "write_file",
+            {"path": pending["path"], "content": pending["content"]},
+            session_id,
+        )
+        if "File error:" in write_result or "required" in write_result.lower():
+            return f"I could not save the script, Sir. {write_result}"
+        if not self._last_touched_files.get(session_id):
+            return "The save was not confirmed, Sir, so I did not execute the script."
+
+        if choice in {"2", "save only"}:
+            return f"The script was saved successfully as `{pending['path']}`, Sir. It was not executed."
+
+        from app.command_executor import command_for_file
+        command = command_for_file(pending["path"])
+        if not command:
+            return f"The script was saved as `{pending['path']}`, Sir, but I need an explicit command to execute this file type."
+        result = self.command_executor.execute(command)
+        output = result.get("stdout", "") or result.get("stderr", "") or "(no output)"
+        if result.get("return_code", -1) != 0:
+            dependency = re.search(r"No module named ['\"]([^'\"]+)['\"]", output)
+            if dependency:
+                install = self.command_executor.execute(
+                    f"python -m pip install {dependency.group(1).split('.')[0]}"
+                )
+                if install.get("return_code", -1) == 0:
+                    result = self.command_executor.execute(command)
+                    output = result.get("stdout", "") or result.get("stderr", "") or "(no output)"
+        if result.get("return_code", -1) != 0:
+            return f"The script was saved, but execution failed (exit code {result.get('return_code')}), Sir.\n{output}"
+        return f"The script was saved and executed successfully (exit code 0), Sir.\nOutput:\n{output}"
+
     def _get_user_honorific(self) -> str:
         """Get the current user's preferred honorific."""
         try:
@@ -836,14 +1000,45 @@ class ConversationManager:
         """Try to determine the target file path from the user's message."""
         import os
         # Look for explicit file names in the message
-        match = re.search(r'(\S+\.py)\b', message)
+        match = re.search(r'(\S+\.(?:py|js|mjs|cjs|ts|sh|bash|ps1|rb|pl|bat|cmd|exe|com))\b', message, re.IGNORECASE)
         if match:
             filename = match.group(1)
             # If it's just a filename (no path), prepend the project dir
             if not os.path.sep in filename and "/" not in filename:
                 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                return os.path.join(project_dir, filename)
-            return filename
+                candidate = os.path.join(project_dir, filename)
+            else:
+                candidate = filename
+            if not self.file_manager or os.path.isfile(candidate):
+                return candidate
+
+        # Resolve descriptions such as "the screenshot python file" against
+        # actual files in the project instead of inventing a filename.
+        described = re.search(
+            r'\b([\w-]+)\s+(python|javascript|typescript|shell|powershell|ruby|perl)\s+file\b',
+            message,
+            re.IGNORECASE,
+        )
+        if described and self.file_manager:
+            stem, language = described.groups()
+            extensions = {
+                "python": {".py"},
+                "javascript": {".js", ".mjs", ".cjs"},
+                "typescript": {".ts"},
+                "shell": {".sh", ".bash"},
+                "powershell": {".ps1"},
+                "ruby": {".rb"},
+                "perl": {".pl"},
+            }[language.lower()]
+            listing = self.file_manager.list_directory(".")
+            matches = [
+                entry["name"] for entry in listing.get("entries", [])
+                if entry["type"] == "file"
+                and Path(entry["name"]).suffix.lower() in extensions
+                and stem.lower() in Path(entry["name"]).stem.lower()
+            ]
+            if len(matches) == 1:
+                return os.path.join(listing["path"], matches[0])
         return ""
 
     def _normalize_recurrence(self, recurrence: str) -> str:
@@ -1097,6 +1292,7 @@ class ConversationManager:
             return f"I was unable to write the file, Sir: {write_result['error']}"
 
         logger.info("File written successfully: %s (%d chars)", file_path, len(new_content))
+        self._last_touched_files[session_id] = file_path
 
         # Step 4: Run the file if requested
         run_output = ""
@@ -1423,6 +1619,7 @@ class ConversationManager:
                     f"You MUST use these exact values in your response. "
                     f"Do NOT use placeholders like [summary] or [percentage]. "
                     f"Do NOT invent or fabricate any data that is not in the output below. "
+                    f"For commands, trust the reported exit code and never claim success when it is non-zero. "
                     f"If the output contains an error, report the error honestly.\n\n"
                     f"ACTUAL TOOL OUTPUT:\n{tool_output}\n\n"
                     f"Now present this information to me as Jarvis would, using ONLY the real values above."
@@ -1486,7 +1683,10 @@ class ConversationManager:
             elif tool_name == "read_file":
                 return self._tool_read_file(args)
             elif tool_name == "write_file":
-                return self._tool_write_file(args)
+                result = self._tool_write_file(args)
+                if not result.startswith("File error:"):
+                    self._last_touched_files[session_id] = args.get("path", "")
+                return result
             elif tool_name == "list_files":
                 return self._tool_list_files(args)
             elif tool_name == "search_files":
@@ -1609,8 +1809,33 @@ class ConversationManager:
             return f"I'm afraid that command is not permitted, Sir. {result.get('blocked_reason', '')}"
         if result.get("timed_out"):
             return "The command exceeded the time limit and was terminated, Sir."
-        output = result.get("stdout", "") or result.get("stderr", "") or "(no output)"
-        return f"Command output:\n{output}"
+        return_code = result.get("return_code", -1)
+        stdout = result.get("stdout", "")
+        stderr = result.get("stderr", "")
+        output = stdout or stderr or "(no output)"
+        if return_code != 0:
+            return (
+                f"Command failed (exit code {return_code}). This is not a successful execution.\n"
+                f"Command: {command}\nOutput:\n{output}"
+            )
+        return (
+            f"Command completed successfully (exit code 0).\n"
+            f"Command: {command}\nOutput:\n{output}"
+        )
+
+    def _resolve_run_file_followup(self, message: str, session_id: str) -> Optional[str]:
+        """Resolve a vague follow-up such as 'run the file' to the last write."""
+        normalized = message.strip().lower().rstrip(".!?")
+        if normalized not in {
+            "run the file", "run file", "run it", "run it anyway",
+            "run the file anyway", "execute the file", "execute it",
+            "execute it anyway", "try it", "try it anyway",
+        }:
+            return None
+        path = self._last_touched_files.get(session_id, "")
+        from app.command_executor import command_for_file
+
+        return command_for_file(path)
 
     def _tool_web_search(self, args: dict) -> str:
         if not self.web_searcher:
@@ -1631,7 +1856,28 @@ class ConversationManager:
     def _tool_network_scan(self) -> str:
         if not self.network_scanner:
             return "Network scanning is not available, Sir."
-        devices = self.network_scanner.scan()
+
+        # Prefer WiFiManager if available (has cross-platform fallback)
+        wifi_manager = None
+        try:
+            from flask import current_app
+            wifi_manager = current_app.config.get("WIFI_MANAGER")
+        except RuntimeError:
+            pass
+
+        devices = []
+        if wifi_manager:
+            try:
+                devices = wifi_manager.scan_network()
+            except Exception:
+                pass
+
+        if not devices:
+            try:
+                devices = self.network_scanner.scan()
+            except Exception:
+                pass
+
         if not devices:
             return "No devices were discovered on the network, Sir."
         lines = [f"Network scan complete. Found {len(devices)} device(s):\n"]

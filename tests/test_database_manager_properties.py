@@ -5,12 +5,38 @@ Tests Properties 12, 13, 18, and 26.
 
 import os
 import tempfile
+import threading
 
 import pytest
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
 from app.database_manager import DatabaseManager
+
+
+def test_database_manager_supports_cross_thread_ui_access():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    manager = DatabaseManager(db_path=path)
+    manager.initialize()
+    errors = []
+
+    def write_message():
+        try:
+            manager.save_message("threaded-session", "user", "Hello")
+        except Exception as exc:
+            errors.append(exc)
+
+    writer = threading.Thread(target=write_message)
+    writer.start()
+    writer.join()
+
+    try:
+        assert not errors
+        assert manager.get_history("threaded-session")
+    finally:
+        manager.close()
+        os.unlink(path)
 
 
 @pytest.fixture

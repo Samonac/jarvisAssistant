@@ -15,6 +15,15 @@ from hypothesis import strategies as st
 from app import create_app
 from app.auth import AuthManager
 from app.config import Config
+from app.conversation_manager import ConversationManager
+from app.database_manager import DatabaseManager
+from app.llm_client import LLMClient
+from run import _QuietPollingAccessFilter
+
+
+class RouteTestLLM(LLMClient):
+    def chat(self, messages, params=None):
+        return "Hello from Jarvis"
 
 
 # --- Fixtures ---
@@ -43,6 +52,51 @@ def app():
 def client(app):
     """Create a test client."""
     return app.test_client()
+
+
+def test_regular_ui_chat_call_returns_success():
+    env = {
+        "LLM_API_KEY": "test_key",
+        "LLM_PROVIDER": "groq",
+    }
+    with patch.dict(os.environ, env, clear=True), patch("app.config.load_dotenv"):
+        config = Config()
+        db = DatabaseManager(":memory:")
+        db.initialize()
+        manager = ConversationManager(RouteTestLLM(), config, db)
+        app = create_app(config)
+        app.config["TESTING"] = True
+        app.config["CONVERSATION_MANAGER"] = manager
+        response = app.test_client().post(
+            "/chat",
+            json={"message": "Hello", "session_id": "ui-test-session"},
+        )
+
+        assert response.status_code == 200
+        assert response.get_json()["response"] == "Hello from Jarvis"
+        db.close()
+
+
+def test_successful_polling_access_logs_are_suppressed():
+    filter_ = _QuietPollingAccessFilter()
+    record = logging.LogRecord(
+        "werkzeug", logging.INFO, "", 0,
+        '192.168.1.23 - - "GET /api/notifications HTTP/1.1" 200 -',
+        (), None,
+    )
+
+    assert filter_.filter(record) is False
+
+
+def test_failed_polling_access_logs_are_kept():
+    filter_ = _QuietPollingAccessFilter()
+    record = logging.LogRecord(
+        "werkzeug", logging.INFO, "", 0,
+        '192.168.1.23 - - "GET /api/restart/status HTTP/1.1" 503 -',
+        (), None,
+    )
+
+    assert filter_.filter(record) is True
 
 
 # --- Property 1: Invalid requests are rejected ---

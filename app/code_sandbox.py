@@ -9,6 +9,7 @@ Dangerous modules (os, subprocess, sys) are blocked by default.
 """
 
 import io
+import ast
 import logging
 import sys
 import traceback
@@ -96,19 +97,18 @@ class CodeSandbox:
                 nonlocal result
                 try:
                     with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                        # Try to eval last line as expression
-                        lines = code.strip().split("\n")
-                        if len(lines) > 1:
-                            exec("\n".join(lines[:-1]), namespace)
-                            try:
-                                exec_result[0] = eval(lines[-1], namespace)
-                            except SyntaxError:
-                                exec(lines[-1], namespace)
+                        # Parse the complete module so multiline constructs are
+                        # never split at an arbitrary physical line boundary.
+                        tree = ast.parse(code.strip(), mode="exec")
+                        if tree.body and isinstance(tree.body[-1], ast.Expr):
+                            last_expression = tree.body.pop()
+                            exec(compile(tree, "<sandbox>", "exec"), namespace)
+                            exec_result[0] = eval(
+                                compile(ast.Expression(last_expression.value), "<sandbox>", "eval"),
+                                namespace,
+                            )
                         else:
-                            try:
-                                exec_result[0] = eval(code.strip(), namespace)
-                            except SyntaxError:
-                                exec(code.strip(), namespace)
+                            exec(compile(tree, "<sandbox>", "exec"), namespace)
                 except Exception as e:
                     exec_error[0] = traceback.format_exc()
 

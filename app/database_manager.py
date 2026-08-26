@@ -7,10 +7,21 @@ Falls back to in-memory storage on database corruption or permission errors.
 
 import logging
 import sqlite3
+import threading
+from functools import wraps
 from datetime import datetime, timedelta
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _database_locked(method):
+    """Serialize access to the shared SQLite connection across Flask threads."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapped
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
@@ -69,6 +80,7 @@ class DatabaseManager:
         self.db_path = db_path
         self._connection: Optional[sqlite3.Connection] = None
         self._using_memory = False
+        self._lock = threading.RLock()
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create a database connection with WAL mode."""
@@ -76,7 +88,9 @@ class DatabaseManager:
             return self._connection
 
         try:
-            self._connection = sqlite3.connect(self.db_path)
+            self._connection = sqlite3.connect(
+                self.db_path, check_same_thread=False
+            )
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.row_factory = sqlite3.Row
             self._using_memory = False
@@ -86,13 +100,14 @@ class DatabaseManager:
                 self.db_path,
                 e,
             )
-            self._connection = sqlite3.connect(":memory:")
+            self._connection = sqlite3.connect(":memory:", check_same_thread=False)
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.row_factory = sqlite3.Row
             self._using_memory = True
 
         return self._connection
 
+    @_database_locked
     def initialize(self) -> None:
         """Create tables if they don't exist. Called at startup.
 
@@ -109,7 +124,7 @@ class DatabaseManager:
         except sqlite3.DatabaseError as e:
             logger.error("Database error during initialization: %s", e)
             # Fall back to in-memory if schema creation fails
-            self._connection = sqlite3.connect(":memory:")
+            self._connection = sqlite3.connect(":memory:", check_same_thread=False)
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.row_factory = sqlite3.Row
             self._using_memory = True
@@ -148,6 +163,7 @@ class DatabaseManager:
             conn.execute("ALTER TABLE metrics ADD COLUMN username TEXT")
             logger.info("Migration: added 'username' column to metrics table")
 
+    @_database_locked
     def save_message(self, session_id: str, role: str, content: str, username: str = None) -> None:
         """Persist a single message to the conversations table."""
         conn = self._get_connection()
@@ -157,6 +173,7 @@ class DatabaseManager:
         )
         conn.commit()
 
+    @_database_locked
     def get_sessions(self, limit: int = 50, username: str = None) -> list[dict]:
         """Retrieve a list of past conversation sessions.
 
@@ -221,6 +238,7 @@ class DatabaseManager:
             })
         return sessions
 
+    @_database_locked
     def save_session_title(self, session_id: str, title: str) -> None:
         """Save or update a generated title for a session."""
         conn = self._get_connection()
@@ -230,6 +248,7 @@ class DatabaseManager:
         )
         conn.commit()
 
+    @_database_locked
     def get_full_history(self, session_id: str) -> list[dict]:
         """Retrieve the full conversation history for a session (no limit).
 
@@ -255,6 +274,7 @@ class DatabaseManager:
             for row in cursor.fetchall()
         ]
 
+    @_database_locked
     def search_conversations(self, query: str, limit: int = 20) -> list[dict]:
         """Search across all conversations for messages matching a query.
 
@@ -284,6 +304,7 @@ class DatabaseManager:
             })
         return results
 
+    @_database_locked
     def get_history(self, session_id: str, max_pairs: int = 10) -> list[dict]:
         """Retrieve the most recent N message pairs for a session.
 
@@ -315,6 +336,7 @@ class DatabaseManager:
             for row in rows
         ]
 
+    @_database_locked
     def prune_old_conversations(self, retention_days: int = 30) -> int:
         """Delete conversations older than retention period.
 
@@ -330,6 +352,7 @@ class DatabaseManager:
         conn.commit()
         return cursor.rowcount
 
+    @_database_locked
     def get_messages_since(self, since: datetime) -> dict[str, list[dict]]:
         """Retrieve all messages recorded after `since`, grouped by username.
 
@@ -360,6 +383,7 @@ class DatabaseManager:
 
     # --- Notes CRUD ---
 
+    @_database_locked
     def save_note(
         self,
         content: str,
@@ -389,6 +413,7 @@ class DatabaseManager:
         conn.commit()
         return cursor.lastrowid
 
+    @_database_locked
     def get_active_notes(self) -> list[dict]:
         """Retrieve all notes with status='active'."""
         conn = self._get_connection()
@@ -411,6 +436,7 @@ class DatabaseManager:
             for row in cursor.fetchall()
         ]
 
+    @_database_locked
     def complete_note(self, note_id: int) -> bool:
         """Mark a note as completed. Returns True if the note was found and updated."""
         conn = self._get_connection()
@@ -422,6 +448,7 @@ class DatabaseManager:
         conn.commit()
         return cursor.rowcount > 0
 
+    @_database_locked
     def search_notes(self, query: str) -> list[dict]:
         """Search notes by content using LIKE matching."""
         conn = self._get_connection()
@@ -443,6 +470,7 @@ class DatabaseManager:
             for row in cursor.fetchall()
         ]
 
+    @_database_locked
     def get_due_notes(self, window_minutes: int = 15) -> list[dict]:
         """Get notes with due dates within the reminder window.
 
@@ -474,6 +502,7 @@ class DatabaseManager:
 
     # --- Metrics methods ---
 
+    @_database_locked
     def save_metric_event(
         self,
         event_type: str,
@@ -492,6 +521,7 @@ class DatabaseManager:
         )
         conn.commit()
 
+    @_database_locked
     def get_metrics_summary(self) -> dict:
         """Return aggregated metrics summary.
 
@@ -573,6 +603,7 @@ class DatabaseManager:
         idx = min(idx, len(durations) - 1)
         return durations[idx]
 
+    @_database_locked
     def get_daily_breakdown(self, days: int = 7) -> list[dict]:
         """Return per-day metrics for the last N days."""
         conn = self._get_connection()
@@ -600,6 +631,7 @@ class DatabaseManager:
             for row in cursor.fetchall()
         ]
 
+    @_database_locked
     def get_hourly_breakdown(self, hours: int = 24) -> list[dict]:
         """Return per-hour metrics for the last N hours.
 
@@ -630,6 +662,7 @@ class DatabaseManager:
             for row in cursor.fetchall()
         ]
 
+    @_database_locked
     def close(self) -> None:
         """Close the database connection."""
         if self._connection:

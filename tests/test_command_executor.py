@@ -289,6 +289,19 @@ class TestCommandOutputCapture:
             cwd=None,
         )
 
+    def test_windows_commands_use_utf8_output_decoding(self):
+        """Windows command diagnostics remain readable when they contain accents."""
+        executor = CommandExecutor(blocklist=[], timeout=60)
+
+        with patch("app.command_executor.IS_WINDOWS", True), \
+             patch("app.command_executor.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="é", stderr="", returncode=0)
+            executor.execute("echo test")
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["encoding"] == "utf-8"
+        assert kwargs["errors"] == "replace"
+
     def test_empty_command_output(self):
         """A command that produces no output returns empty strings."""
         executor = CommandExecutor(blocklist=[], timeout=60)

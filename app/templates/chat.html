@@ -76,7 +76,17 @@
         <div class="chat-messages" id="chat-messages">
             <template x-for="msg in messages" :key="msg.id">
                 <div :class="'message message-' + msg.role">
-                    <div class="message-content" x-text="msg.content"
+                    <template x-if="msg.progress">
+                        <div class="gateway-progress" x-data="{expanded: false}">
+                            <button type="button" class="gateway-progress-toggle" @click="expanded = !expanded">
+                                <span class="gateway-progress-arrow" x-text="expanded ? '▾' : '▸'"></span>
+                                <span x-text="msg.progressLabel"></span>
+                                <strong x-text="msg.profile"></strong>
+                            </button>
+                            <pre x-show="expanded" x-text="msg.progressContent" class="gateway-progress-details"></pre>
+                        </div>
+                    </template>
+                    <div x-show="!msg.progress" class="message-content" x-text="msg.content"
                          :style="msg.role === 'thinking' ? 'white-space: pre-wrap' : ''"></div>
                     <!-- Reminder quick action buttons (only for reminder notifications) -->
                     <div class="reminder-actions" x-show="msg.isReminder === true && msg.noteId" x-cloak>
@@ -242,6 +252,15 @@
                         <input type="range" min="-2" max="2" step="0.1" x-model.number="inferenceParams.presence_penalty"
                                @change="saveInferenceParams()" class="voice-slider">
                     </div>
+                    <div class="voice-row" style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--border)">
+                        <label class="voice-toggle-label">
+                            <input type="checkbox" x-model="agentModeEnabled" @change="toggleAgentMode()">
+                            🤖 Agent Mode
+                        </label>
+                        <small style="display:block;font-size:0.7rem;color:var(--text-muted);margin-top:0.2rem">
+                            Multi-step planning &amp; tool execution. Turn off for faster responses.
+                        </small>
+                    </div>
                 </div>
 
                 <!-- Voice Commands -->
@@ -392,6 +411,9 @@ function chatApp() {
         // Inference params (loaded from server)
         inferenceParams: {temperature: 0.7, top_p: 0.9, max_tokens: 1024, frequency_penalty: 0.0, presence_penalty: 0.0},
 
+        // Agent mode toggle (loaded from server config)
+        agentModeEnabled: true,
+
         // TTS state
         ttsEnabled: prefs.ttsEnabled !== false,
         showVoicePanel: false,
@@ -477,6 +499,14 @@ function chatApp() {
                 const resp = await fetch('/api/inference');
                 if (resp.ok) this.inferenceParams = await resp.json();
             } catch (e) {}
+            // Also load agent mode setting
+            try {
+                const resp = await fetch('/api/config');
+                if (resp.ok) {
+                    const cfg = await resp.json();
+                    this.agentModeEnabled = cfg.agent_mode_enabled !== false;
+                }
+            } catch (e) {}
         },
 
         async saveInferenceParams() {
@@ -485,6 +515,16 @@ function chatApp() {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(this.inferenceParams)
+                });
+            } catch (e) {}
+        },
+
+        async toggleAgentMode() {
+            try {
+                await fetch('/api/config', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: 'agent_mode_enabled', value: this.agentModeEnabled})
                 });
             } catch (e) {}
         },
@@ -736,6 +776,11 @@ function chatApp() {
             const now = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
             this.messages.push({ id: Date.now(), role: 'user', content: userMsg, timestamp: now });
             this.loading = true;
+            if (!this.sessionId) {
+                this.sessionId = this.createSessionId();
+                localStorage.setItem('jarvis_session_id', this.sessionId);
+            }
+            const progressPoll = this.pollChatProgress(this.sessionId);
             this.scrollToBottom();
 
             try {
@@ -785,9 +830,57 @@ function chatApp() {
             } catch (err) {
                 this.messages.push({ id: Date.now() + 1, role: 'assistant', content: 'I apologize, Sir. A communication error has occurred.' });
             }
+            clearInterval(progressPoll);
+            await this.drainChatProgress(this.sessionId);
             this.loading = false;
             this.scrollToBottom();
             this.$nextTick(() => this.$refs.chatInput && this.$refs.chatInput.focus());
+        },
+
+        createSessionId() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+            return 'session-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+        },
+
+        pollChatProgress(sessionId) {
+            const interval = setInterval(() => this.fetchChatProgress(sessionId), 500);
+            this.fetchChatProgress(sessionId);
+            return interval;
+        },
+
+        async fetchChatProgress(sessionId) {
+            try {
+                const resp = await fetch('/api/chat-progress/' + encodeURIComponent(sessionId), {
+                    credentials: 'same-origin'
+                });
+                if (!resp.ok) return;
+                const events = await resp.json();
+                for (const event of events) {
+                    const label = event.type === 'gateway_request'
+                        ? `Gateway request [${event.profile}]\nPrompt:\n${event.prompt}`
+                        : `Gateway reply [${event.profile}]${event.model ? ` - ${event.model}` : ''}`
+                          + `\n${event.reply || ''}`;
+                    this.messages.push({
+                        id: Date.now() + Math.random(),
+                        role: 'thinking',
+                        content: label,
+                        progress: true,
+                        progressLabel: event.type === 'gateway_request' ? 'Gateway request' : 'Gateway reply',
+                        profile: event.profile || 'unknown',
+                        progressContent: event.type === 'gateway_request'
+                            ? event.prompt
+                            : `${event.model ? `Model: ${event.model}\n` : ''}${event.latency_ms ? `Latency: ${event.latency_ms} ms\n` : ''}${event.reply || ''}`,
+                        timestamp: event.timestamp || ''
+                    });
+                }
+                if (events.length) this.scrollToBottom();
+            } catch (e) {}
+        },
+
+        async drainChatProgress(sessionId) {
+            await this.fetchChatProgress(sessionId);
         },
 
         scrollToBottom() {

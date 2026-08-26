@@ -16,6 +16,8 @@ from hypothesis import strategies as st
 
 from app.llm_client import (
     LLMClient,
+    GatewayClient,
+    FailoverLLMClient,
     GroqClient,
     HuggingFaceClient,
     GeminiClient,
@@ -501,6 +503,56 @@ class TestPerCallParamsAndModelOverride:
         assert contents[0]["role"] == "user"
         assert contents[1]["role"] == "model"
         assert contents[2]["role"] == "user"
+
+    def test_internal_profile_hint_beats_long_history_heuristic(self):
+        client = GatewayClient("http://gateway.test")
+        messages = [
+            {"role": "system", "content": "You are Jarvis.", "_profile": "fast"},
+        ]
+        for index in range(10):
+            messages.extend([
+                {"role": "user", "content": f"Turn {index}"},
+                {"role": "assistant", "content": "Acknowledged."},
+            ])
+        messages.append({"role": "user", "content": "List the Python files."})
+
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "message": {"content": "run.py"},
+            "model": "qwen3:8b-fast",
+        }
+        with patch("app.llm_client.requests.post", return_value=response) as mock_post:
+            client.chat(messages)
+
+        assert mock_post.call_args.kwargs["json"]["profile"] == "fast"
+
+    def test_gateway_emits_request_and_response_progress(self):
+        client = GatewayClient("http://gateway.test")
+        events = []
+        client.set_progress_callback(events.append)
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "message": {"content": "All good."},
+            "model": "qwen3:8b-fast",
+            "latency_ms": 42,
+        }
+
+        with patch("app.llm_client.requests.post", return_value=response):
+            assert client.chat([{"role": "user", "content": "Hello"}]) == "All good."
+
+        assert [event["type"] for event in events] == [
+            "gateway_request", "gateway_response"
+        ]
+        assert events[0]["profile"] == "fast"
+        assert "Hello" in events[0]["prompt"]
+        assert events[1]["reply"] == "All good."
+
+    def test_repetition_truncation_does_not_modify_code_blocks(self):
+        code = "```python\n" + "value = 'repeated text'\n" * 10 + "```"
+
+        assert FailoverLLMClient._truncate_repetition(code) == code
 
 
 class TestCreateLLMClient:

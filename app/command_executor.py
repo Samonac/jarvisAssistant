@@ -10,11 +10,39 @@ Includes blocklist checking and timeout enforcement.
 
 import platform
 import subprocess
+from pathlib import Path
 from typing import Optional
 
 
 # Detect OS once at import time
 IS_WINDOWS = platform.system() == "Windows"
+
+
+def command_for_file(path: str) -> Optional[str]:
+    """Build a platform-neutral command for a common executable file type."""
+    if not path:
+        return None
+
+    quoted_path = '"' + path.replace('"', '\\"') + '"'
+    suffix = Path(path).suffix.lower()
+    launchers = {
+        ".py": "python",
+        ".js": "node",
+        ".mjs": "node",
+        ".cjs": "node",
+        ".ts": "npx tsx",
+        ".sh": "bash",
+        ".bash": "bash",
+        ".rb": "ruby",
+        ".pl": "perl",
+    }
+    if suffix in launchers:
+        return f"{launchers[suffix]} {quoted_path}"
+    if suffix == ".ps1":
+        return f"powershell -NoProfile -ExecutionPolicy Bypass -File {quoted_path}"
+    if suffix in {".bat", ".cmd", ".exe", ".com"}:
+        return quoted_path
+    return None
 
 
 class CommandExecutor:
@@ -92,6 +120,8 @@ class CommandExecutor:
                     shell=True,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=self.timeout,
                     cwd=self.cwd,
                 )

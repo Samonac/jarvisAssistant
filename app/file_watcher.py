@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 WATCH_EXTENSIONS = {".py", ".env", ".html", ".css", ".js"}
 
 # Directories to ignore
-IGNORE_DIRS = {"__pycache__", ".git", ".hypothesis", ".pytest_cache", "venv", "node_modules", "scripts", "plugins", "picture", "oldDB", "uploads"}
+IGNORE_DIRS = {"__pycache__", ".git", ".hypothesis", ".pytest_cache", "venv", "node_modules", "scripts", "plugins", "picture", "oldDB", "uploads", "backups"}
 
 
 class FileWatcher:

@@ -7,6 +7,7 @@ Single-threaded to minimize memory usage.
 
 import logging
 import os
+import re
 import sys
 
 # Configure logging before imports
@@ -17,6 +18,17 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _QuietPollingAccessFilter(logging.Filter):
+    """Hide successful health-style polling requests from the access log."""
+
+    _SUCCESSFUL_POLL = re.compile(
+        r'"(?:GET|HEAD) /api/(?:notifications|restart/status|chat-progress/) HTTP/[^" ]+" 200(?:\s|$)'
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not self._SUCCESSFUL_POLL.search(record.getMessage())
 
 
 def main():
@@ -329,15 +341,18 @@ def main():
         file_watcher.start()
         app.config["FILE_WATCHER"] = file_watcher
 
-    # Start server
+    logging.getLogger("werkzeug").addFilter(_QuietPollingAccessFilter())
+
+    # Progress polling requires the chat request and progress request to be
+    # served concurrently while a Gateway call is in progress.
     logger.info(
-        "Starting Jarvis Assistant on 0.0.0.0:%d (single-threaded)", config.port
+        "Starting Jarvis Assistant on 0.0.0.0:%d (threaded)", config.port
     )
     app.run(
         host="0.0.0.0",
         port=config.port,
         debug=False,
-        threaded=False,
+        threaded=True,
     )
 
 
